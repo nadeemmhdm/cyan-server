@@ -16,7 +16,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y caddy
       - name: Install Python deps
         run: pip install -r requirements.txt
-      - name: Run Phase 1 tests
+      - name: Run hardware/OS detection tests
         run: python3 tests/test_detection.py
-      - name: Run Phase 2 tests
-        run: python3 tests/test_phase2.py
+      - name: Run auth/storage/app-manager tests
+        run: python3 tests/test_services.py
+      - name: Run recovery tests
+        run: python3 tests/test_recovery.py

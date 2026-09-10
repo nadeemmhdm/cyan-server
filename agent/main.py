@@ -14,12 +14,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from core.detection import gather_system_report
 from core.database import init_db
 from core.version import VERSION
-from core.update import check_for_update, apply_update, UpdateError
+from core.update import (check_for_update, apply_update, UpdateError,
+                          get_update_config, set_update_config, start_auto_update_thread)
+from security.headers import SecurityHeadersMiddleware
+from web.manager import recover_sites
+from apps.manager import recover_apps
 from platform_impl.base import get_platform_adapters
 from security.auth import ensure_default_admin
 from api.auth_routes import router as auth_router
@@ -28,7 +34,9 @@ from api.storage_routes import router as storage_router
 from api.apps_routes import router as apps_router
 from api.cloudflare_routes import router as cloudflare_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.2.0-phase2")
+app = FastAPI(title="Cyan Server Agent", version="0.3.0")
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,10 +56,10 @@ _START_TIME = time.time()
 
 @app.on_event("startup")
 def _startup():
-    """Phase 1 <-> Phase 2 connection point: the same agent process that
-    serves hardware detection (Phase 1) now also owns the DB, auth, and
-    every Phase 2 module. Creates the schema and a first admin account if
-    this is a fresh install."""
+    """The same agent process that serves hardware detection also owns
+    the DB, auth, and every service module (web/storage/apps/cloudflare).
+    Creates the schema and a first admin account if this is a fresh
+    install."""
     init_db()
     username, generated_password = ensure_default_admin()
     if generated_password:
@@ -61,6 +69,18 @@ def _startup():
         print(f"  Password: {generated_password}")
         print(f"  (shown once — store it now)")
         print("=" * 60)
+
+    # Automatic Recovery (spec section 20): bring back anything that was
+    # marked running before this agent process last stopped.
+    site_results = recover_sites()
+    app_results = recover_apps()
+    recovered = [r for r in site_results + app_results if r["action"] == "recovered"]
+    if recovered:
+        print(f"Recovered {len(recovered)} service(s) that were running before restart: "
+              f"{[r['name'] for r in recovered]}")
+
+    # Auto-update background thread (off by auto-apply default, on by auto-check default)
+    app.state.update_stop_event = start_auto_update_thread()
 
 
 @app.get("/api/health")
@@ -89,6 +109,40 @@ def update_apply():
         return {"success": True, "message": message}
     except UpdateError as e:
         raise HTTPException(400, str(e))
+
+
+@app.get("/api/update/config")
+def update_config_get():
+    cfg = get_update_config()
+    return {
+        "auto_check": cfg.auto_check, "auto_apply": cfg.auto_apply,
+        "check_interval_minutes": cfg.check_interval_minutes,
+        "last_checked_at": cfg.last_checked_at.isoformat() if cfg.last_checked_at else None,
+        "last_check_result": cfg.last_check_result,
+    }
+
+
+class UpdateConfigRequest(BaseModel):
+    auto_check: bool | None = None
+    auto_apply: bool | None = None
+    check_interval_minutes: int | None = None
+
+
+@app.post("/api/update/config")
+def update_config_set(req: UpdateConfigRequest):
+    cfg = set_update_config(req.auto_check, req.auto_apply, req.check_interval_minutes)
+    return {"auto_check": cfg.auto_check, "auto_apply": cfg.auto_apply,
+            "check_interval_minutes": cfg.check_interval_minutes}
+
+
+@app.post("/api/recover")
+def recover_all():
+    """The 'single command brings everything back up' endpoint — same
+    logic the agent runs automatically on startup, exposed so it can also
+    be triggered on demand (``cyan up``) without restarting the agent."""
+    sites = recover_sites()
+    applications = recover_apps()
+    return {"sites": sites, "applications": applications}
 
 
 @app.get("/api/system")
@@ -152,6 +206,16 @@ def service_stop(service_name: str):
 def service_status(service_name: str):
     _, svc_mgr, _ = get_platform_adapters()
     return {"service": service_name, "status": svc_mgr.status(service_name)}
+
+
+# --- Dashboard ---------------------------------------------------------------
+# Served from this same process/port so `python3 agent/main.py` (or
+# `cyan start`) is the one command that brings up both the API and the
+# dashboard — no separate static file server needed. Mounted last so it
+# never shadows the /api/* routes above.
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="dashboard")
 
 
 if __name__ == "__main__":

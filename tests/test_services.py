@@ -1,5 +1,5 @@
 """
-Phase 2 smoke tests. Uses a temp CYAN_DATA_DIR so this never touches the
+Auth, storage, and application-manager smoke tests. Uses a temp CYAN_DATA_DIR so this never touches the
 developer's real ~/.cyan-server install. Every assertion here is against
 real DB rows / real files / real HTTP responses from a live agent — see
 test_full_stack() which spins up the actual agent process.
@@ -75,4 +75,4 @@ if __name__ == "__main__":
         t()
         print(f"  ok  {t.__name__}")
     shutil.rmtree(TEST_DATA_DIR, ignore_errors=True)
-    print(f"All {len(tests)} Phase 2 tests passed.")
+    print(f"All {len(tests)} tests passed.")

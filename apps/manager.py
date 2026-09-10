@@ -1,9 +1,9 @@
 """
 Cyan Server - Application Manager
 Manifest-driven app installs (spec section 8). Validates requirements
-against the REAL SystemReport from core.detection (Phase 1) before
-installing anything — this is where Phase 1 and Phase 2 are directly wired
-together, not just living in the same repo.
+against the REAL SystemReport from core.detection before installing
+anything — this is where the Application Manager and hardware detection
+are directly wired together, not just living in the same repo.
 """
 from __future__ import annotations
 
@@ -189,3 +189,24 @@ def list_apps() -> list[Application]:
         return session.query(Application).all()
     finally:
         session.close()
+
+
+def recover_apps() -> list[dict]:
+    """Same idempotent recovery pattern as web/manager.py::recover_sites(),
+    for Docker/Compose applications."""
+    results = []
+    for a in list_apps():
+        if a.status != "running":
+            continue
+        if a.app_type == "docker" and a.container_id:
+            check = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}",
+                                     f"cyan-app-{a.name}"], capture_output=True, text=True, timeout=10)
+            if check.returncode == 0 and check.stdout.strip() == "true":
+                results.append({"name": a.name, "action": "already_running"})
+                continue
+        try:
+            start_app(a.name)
+            results.append({"name": a.name, "action": "recovered"})
+        except AppError as e:
+            results.append({"name": a.name, "action": "failed", "error": str(e)})
+    return results

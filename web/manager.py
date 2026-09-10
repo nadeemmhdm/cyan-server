@@ -217,6 +217,49 @@ def list_sites() -> list[Website]:
         session.close()
 
 
+def recover_sites() -> list[dict]:
+    """Bring every site that was marked 'running' before the agent last
+    stopped back up for real (spec section 20: Automatic Recovery). A site
+    row can say status='running' with a stale pid from a previous process
+    that's now dead — e.g. after a reboot. This checks each one against
+    the real process table / Docker and only redeploys what's actually
+    down, so calling this twice in a row is safe (idempotent)."""
+    results = []
+    for site in list_sites():
+        if site.status != "running":
+            continue
+        if _is_actually_running(site):
+            results.append({"name": site.name, "action": "already_running"})
+            continue
+        try:
+            deploy_site(site.name)
+            results.append({"name": site.name, "action": "recovered"})
+        except SiteError as e:
+            results.append({"name": site.name, "action": "failed", "error": str(e)})
+    return results
+
+
+def _is_actually_running(site: Website) -> bool:
+    if site.site_type == "docker":
+        result = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}",
+                                  f"cyan-{site.name}"], capture_output=True, text=True, timeout=10)
+        return result.returncode == 0 and result.stdout.strip() == "true"
+
+    # PID existence alone is unreliable — PIDs get reused (fast, in
+    # containers especially), so a dead site's old PID can appear to
+    # belong to a live, unrelated process. The authoritative signal for
+    # "is this site actually serving" is whether something is listening
+    # on its port right now.
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            s.connect(("127.0.0.1", site.port))
+            return True
+        except OSError:
+            return False
+
+
 def get_site_logs(name: str, lines: int = 100) -> str:
     session = get_session()
     try:

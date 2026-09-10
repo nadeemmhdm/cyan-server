@@ -130,6 +130,26 @@ class TunnelHostname(Base):
     local_service = Column(String, nullable=False)  # e.g. http://localhost:8080
 
 
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    id = Column(Integer, primary_key=True)
+    event = Column(String, nullable=False)       # login_success | login_failed | login_locked
+    username = Column(String, nullable=True)
+    source_ip = Column(String, nullable=True)
+    detail = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class UpdateConfig(Base):
+    __tablename__ = "update_config"
+    id = Column(Integer, primary_key=True)
+    auto_check = Column(Boolean, default=True)
+    auto_apply = Column(Boolean, default=False)   # off by default — downloading is safe, auto-applying isn't
+    check_interval_minutes = Column(Integer, default=60)
+    last_checked_at = Column(DateTime, nullable=True)
+    last_check_result = Column(String, nullable=True)  # up_to_date | update_available | error
+
+
 def init_db():
     Base.metadata.create_all(engine)
 

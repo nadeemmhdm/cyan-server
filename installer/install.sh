@@ -82,7 +82,7 @@ case ":$PATH:" in
   *) echo "  NOTE: add $BIN_DIR to your PATH to use 'cyan' directly." ;;
 esac
 
-# --- 7/8. Start agent + dashboard --------------------------------------------
+# --- 7/8. Start agent (also serves the dashboard on the same port) ----------
 echo "→ Starting Cyan Agent"
 nohup "$INSTALL_DIR/venv/bin/python" "$INSTALL_DIR/agent/main.py" > "$INSTALL_DIR/agent.log" 2>&1 &
 sleep 1

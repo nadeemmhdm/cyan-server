@@ -140,7 +140,7 @@ def setup():
 
 @app.command()
 def start():
-    """Start the Cyan Server agent (foreground, Phase 1)."""
+    """Start the Cyan Server agent (API + dashboard, one process)."""
     import subprocess
     agent_path = Path(__file__).resolve().parent.parent / "agent" / "main.py"
     console.print("Starting Cyan Agent...")
@@ -157,8 +157,19 @@ def start():
 
 
 @app.command()
-def update(apply: bool = typer.Option(False, "--apply", help="Actually apply the update, not just check.")):
+def update(apply: bool = typer.Option(False, "--apply", help="Actually apply the update, not just check."),
+           auto: str = typer.Option(None, "--auto", help="on|off — enable/disable automatic background checks + apply.")):
     """Check for (and optionally apply) updates via git — spec's `cyan update`."""
+    if auto is not None:
+        if auto not in ("on", "off"):
+            console.print("[red]--auto must be 'on' or 'off'[/red]")
+            raise typer.Exit(code=1)
+        enabled = auto == "on"
+        _agent_post("/api/update/config", {"auto_check": True, "auto_apply": enabled}, auth=False)
+        console.print(f"[green]✓ Auto-update {'enabled' if enabled else 'disabled'}[/green] "
+                       f"(background checks stay on either way; this controls whether updates auto-apply)")
+        return
+
     result = _agent_get("/api/update/check")
     if not result["is_git_repo"]:
         console.print("[yellow]Not a git checkout — cannot self-update. Reinstall via the installer.[/yellow]")
@@ -177,6 +188,26 @@ def update(apply: bool = typer.Option(False, "--apply", help="Actually apply the
 
     applied = _agent_post("/api/update/apply", auth=False, method="POST")
     console.print(f"[green]✓ {applied['message']}[/green]")
+
+
+@app.command()
+def up():
+    """Bring everything back up in one command — recovers any website or
+    application that was running before the agent last stopped (e.g.
+    after a reboot or time offline). Safe to run any time; already-running
+    services are left alone."""
+    result = _agent_post("/api/recover", auth=False, method="POST")
+    all_results = result["sites"] + result["applications"]
+    if not all_results:
+        console.print("[green]Nothing to recover — no services were previously running.[/green]")
+        return
+    for r in all_results:
+        if r["action"] == "recovered":
+            console.print(f"[green]✓ {r['name']}: recovered[/green]")
+        elif r["action"] == "already_running":
+            console.print(f"  {r['name']}: already running")
+        else:
+            console.print(f"[red]✗ {r['name']}: {r.get('error', 'failed')}[/red]")
 
 
 @app.command()
