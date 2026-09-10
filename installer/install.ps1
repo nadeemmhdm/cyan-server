@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 $InstallDir = "$env:LOCALAPPDATA\CyanServer"
-$RepoUrl = "https://github.com/example/cyan-server"  # placeholder until repo is published
+$RepoUrl = "https://github.com/nadeemmhdm/cyan-server"  # real, published repo
 
 Write-Host "Cyan Server Installer" -ForegroundColor Cyan
 Write-Host "======================"

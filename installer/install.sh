@@ -4,7 +4,7 @@
 set -eu
 
 INSTALL_DIR="${CYAN_INSTALL_DIR:-$HOME/.cyan-server}"
-REPO_URL="${CYAN_REPO_URL:-https://github.com/example/cyan-server}"  # placeholder until repo is published
+REPO_URL="${CYAN_REPO_URL:-https://github.com/nadeemmhdm/cyan-server}"  # real, published repo
 PY_MIN_MAJOR=3
 PY_MIN_MINOR=10
 
