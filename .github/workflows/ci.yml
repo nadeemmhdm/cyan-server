@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y caddy
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+      - name: Run Phase 1 tests
+        run: python3 tests/test_detection.py
+      - name: Run Phase 2 tests
+        run: python3 tests/test_phase2.py
