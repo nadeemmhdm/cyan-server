@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cyan Server Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --border: #232c38; --text: #e6edf3;
+    --muted: #8b98a5; --accent: #22d3ee; --accent2: #34d399; --warn: #f59e0b; --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  header {
+    padding: 20px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+  header h1 span { color: var(--accent); }
+  #agent-status { font-size: 13px; color: var(--muted); }
+  #agent-status.ok { color: var(--accent2); }
+  #agent-status.down { color: var(--danger); }
+  main { padding: 28px; max-width: 1100px; margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .card h3 { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric { font-size: 28px; font-weight: 600; }
+  .metric small { font-size: 14px; color: var(--muted); font-weight: 400; }
+  .bar-bg { background: #1c2531; border-radius: 6px; height: 8px; margin-top: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { padding: 6px 4px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .section-title { margin: 32px 0 12px; font-size: 15px; color: var(--muted); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+  .badge.yes { background: rgba(52,211,153,0.15); color: var(--accent2); }
+  .badge.no { background: rgba(248,113,113,0.15); color: var(--danger); }
+  .placeholder { color: var(--muted); font-size: 13px; padding: 16px; border: 1px dashed var(--border); border-radius: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cyan<span>Server</span></h1>
+  <div id="agent-status">connecting…</div>
+</header>
+
+<main>
+  <div class="grid" id="live-grid">
+    <div class="card"><h3>CPU</h3><div class="metric" id="cpu-metric">–</div><div class="bar-bg"><div class="bar-fill" id="cpu-bar" style="width:0%"></div></div></div>
+    <div class="card"><h3>RAM</h3><div class="metric" id="ram-metric">–</div><div class="bar-bg"><div class="bar-fill" id="ram-bar" style="width:0%"></div></div></div>
+    <div class="card"><h3>Agent Uptime</h3><div class="metric" id="uptime-metric">–</div></div>
+    <div class="card"><h3>Resource Profile</h3><div class="metric" id="profile-metric">–</div></div>
+  </div>
+
+  <div class="section-title">System</div>
+  <div class="card">
+    <table id="system-table"><tbody></tbody></table>
+  </div>
+
+  <div class="section-title">Disks</div>
+  <div class="card">
+    <table id="disk-table">
+      <thead><tr><th>Mount</th><th>Device</th><th>Type</th><th>Used</th><th>Free</th><th>Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Network</div>
+  <div class="card">
+    <table id="net-table">
+      <thead><tr><th>Interface</th><th>Address</th><th>Up</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div style="margin-top:12px;font-size:13px;color:var(--muted)">Listening ports: <span id="ports-list">–</span></div>
+  </div>
+
+  <div class="section-title">Websites</div>
+  <div class="card" id="websites-card">
+    <table id="sites-table">
+      <thead><tr><th>Name</th><th>Type</th><th>Port</th><th>Domain</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="sites-empty" class="placeholder" style="display:none;margin-top:12px">
+      No sites yet. Create one with <code>cyan web create</code>.
+    </div>
+  </div>
+
+  <div class="section-title">Storage</div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span id="storage-usage" style="color:var(--muted);font-size:13px">–</span>
+    </div>
+    <table id="storage-table">
+      <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Applications</div>
+  <div class="card">
+    <table id="apps-table">
+      <thead><tr><th>Name</th><th>Type</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="apps-empty" class="placeholder" style="display:none;margin-top:12px">
+      No applications installed. Use <code>cyan apps install &lt;manifest.yaml&gt;</code>.
+    </div>
+  </div>
+
+  <div class="section-title">Cloudflare Tunnel</div>
+  <div class="card" id="cloudflare-card">
+    <div id="cf-status" style="font-size:13px;color:var(--muted)">checking…</div>
+  </div>
+
+  <div class="section-title" style="margin-top:32px">Login</div>
+  <div class="card" id="login-card">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input id="login-user" placeholder="username" value="admin"
+             style="background:#0f1520;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px">
+      <input id="login-pass" placeholder="password" type="password"
+             style="background:#0f1520;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px">
+      <button id="login-btn" style="background:var(--accent);border:none;color:#031017;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">Log in</button>
+      <span id="login-status" style="font-size:13px;color:var(--muted)"></span>
+    </div>
+    <div class="placeholder" style="margin-top:12px">
+      The dashboard needs a login to manage Websites/Storage/Apps (matches the agent's auth — the
+      same account <code>cyan login</code> uses). System metrics above are shown either way.
+    </div>
+  </div>
+</main>
+
+<script>
+const AGENT = "http://" + (location.hostname || "localhost") + ":7331";
+let AUTH_TOKEN = null;  // kept in memory for this page load only; re-login after refresh
+
+async function poll() {
+  const statusEl = document.getElementById("agent-status");
+  try {
+    const health = await fetch(AGENT + "/api/health").then(r => r.json());
+    statusEl.textContent = "agent online";
+    statusEl.className = "ok";
+    document.getElementById("uptime-metric").innerHTML =
+      Math.round(health.uptime_seconds) + "s";
+
+    const live = await fetch(AGENT + "/api/system/live").then(r => r.json());
+    document.getElementById("cpu-metric").innerHTML = live.cpu_percent.toFixed(1) + "<small> %</small>";
+    document.getElementById("cpu-bar").style.width = live.cpu_percent + "%";
+    document.getElementById("ram-metric").innerHTML =
+      live.ram_used_gb.toFixed(1) + " / " + live.ram_total_gb.toFixed(1) + "<small> GB</small>";
+    document.getElementById("ram-bar").style.width = live.ram_percent + "%";
+
+    const ports = await fetch(AGENT + "/api/network/ports").then(r => r.json());
+    document.getElementById("ports-list").textContent = ports.open_ports.join(", ") || "none";
+  } catch (e) {
+    statusEl.textContent = "agent unreachable — run: cyan start";
+    statusEl.className = "down";
+  }
+}
+
+async function loadSystem() {
+  try {
+    const sys = await fetch(AGENT + "/api/system").then(r => r.json());
+    document.getElementById("profile-metric").textContent = sys.resource_profile;
+
+    const rows = [
+      ["Hostname", sys.hostname],
+      ["OS", sys.os_name + " — " + sys.os_version],
+      ["Architecture", sys.architecture],
+      ["CPU", sys.cpu_model + " (" + sys.cpu_cores_physical + "P / " + sys.cpu_cores_logical + "L)"],
+      ["Primary IP", sys.primary_ip || "unknown"],
+      ["Docker", sys.docker_available
+          ? '<span class="badge yes">available (' + sys.docker_version + ')</span>'
+          : '<span class="badge no">not found</span>'],
+      ["Virtualization", sys.virtualization || "none detected"],
+    ];
+    const tbody = document.querySelector("#system-table tbody");
+    tbody.innerHTML = rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("");
+
+    const diskBody = document.querySelector("#disk-table tbody");
+    diskBody.innerHTML = sys.disks.map(d =>
+      `<tr><td>${d.mountpoint}</td><td>${d.device}</td><td>${d.fstype}</td>
+       <td>${d.used_gb} GB</td><td>${d.free_gb} GB</td><td>${d.total_gb} GB</td></tr>`
+    ).join("");
+
+    const netBody = document.querySelector("#net-table tbody");
+    netBody.innerHTML = sys.network_interfaces.map(n =>
+      `<tr><td>${n.name}</td><td>${n.address || "–"}</td>
+       <td>${n.is_up ? '<span class="badge yes">up</span>' : '<span class="badge no">down</span>'}</td></tr>`
+    ).join("");
+  } catch (e) { /* agent offline; poll() already surfaces this */ }
+}
+
+poll();
+loadSystem();
+setInterval(poll, 3000);
+setInterval(loadSystem, 15000);
+
+function authHeaders() {
+  return AUTH_TOKEN ? { "Authorization": "Bearer " + AUTH_TOKEN } : {};
+}
+
+document.getElementById("login-btn").addEventListener("click", async () => {
+  const user = document.getElementById("login-user").value;
+  const pass = document.getElementById("login-pass").value;
+  const statusEl = document.getElementById("login-status");
+  try {
+    const res = await fetch(AGENT + "/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user, password: pass }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      statusEl.textContent = body.detail || "Login failed";
+      statusEl.style.color = "var(--danger)";
+      return;
+    }
+    const data = await res.json();
+    AUTH_TOKEN = data.access_token;
+    statusEl.textContent = "logged in as " + user;
+    statusEl.style.color = "var(--accent2)";
+    loadWebsites();
+    loadStorage();
+    loadApps();
+    loadCloudflare();
+  } catch (e) {
+    statusEl.textContent = "agent unreachable";
+    statusEl.style.color = "var(--danger)";
+  }
+});
+
+async function loadWebsites() {
+  if (!AUTH_TOKEN) return;
+  try {
+    const sites = await fetch(AGENT + "/api/web", { headers: authHeaders() }).then(r => r.json());
+    const tbody = document.querySelector("#sites-table tbody");
+    document.getElementById("sites-empty").style.display = sites.length ? "none" : "block";
+    tbody.innerHTML = sites.map(s => `
+      <tr>
+        <td>${s.name}</td><td>${s.site_type}</td><td>${s.port}</td>
+        <td>${s.domain || "-"}</td>
+        <td>${s.status === "running" ? '<span class="badge yes">running</span>' : '<span class="badge no">stopped</span>'}</td>
+        <td><a href="http://${location.hostname}:${s.port}" target="_blank" style="color:var(--accent)">open</a></td>
+      </tr>`).join("");
+  } catch (e) { /* not logged in or agent offline */ }
+}
+
+async function loadStorage() {
+  if (!AUTH_TOKEN) return;
+  try {
+    const usage = await fetch(AGENT + "/api/storage/usage", { headers: authHeaders() }).then(r => r.json());
+    document.getElementById("storage-usage").textContent =
+      "Used " + usage.used_gb + " GB" + (usage.quota_gb ? " / " + usage.quota_gb + " GB quota" : " / unlimited");
+
+    const listing = await fetch(AGENT + "/api/storage/list?path=", { headers: authHeaders() }).then(r => r.json());
+    const tbody = document.querySelector("#storage-table tbody");
+    tbody.innerHTML = listing.entries.map(e => `
+      <tr><td>${e.name}</td><td>${e.is_dir ? "dir" : "file"}</td>
+      <td>${e.size_bytes === null ? "-" : e.size_bytes + " B"}</td>
+      <td>${e.modified.slice(0,19).replace("T"," ")}</td></tr>`).join("");
+  } catch (e) { /* not logged in or agent offline */ }
+}
+
+async function loadApps() {
+  if (!AUTH_TOKEN) return;
+  try {
+    const apps = await fetch(AGENT + "/api/apps", { headers: authHeaders() }).then(r => r.json());
+    document.getElementById("apps-empty").style.display = apps.length ? "none" : "block";
+    const tbody = document.querySelector("#apps-table tbody");
+    tbody.innerHTML = apps.map(a => `
+      <tr><td>${a.name}</td><td>${a.app_type}</td>
+      <td>${a.status === "running" ? '<span class="badge yes">running</span>' : '<span class="badge no">stopped</span>'}</td></tr>`).join("");
+  } catch (e) { /* not logged in or agent offline */ }
+}
+
+async function loadCloudflare() {
+  try {
+    const avail = await fetch(AGENT + "/api/cloudflare/available").then(r => r.json());
+    const el = document.getElementById("cf-status");
+    if (!avail.cloudflared_available) {
+      el.innerHTML = 'cloudflared not installed on this host — <span style="color:var(--text)">Cloudflare Tunnel is fully optional</span>, LAN/web hosting works without it.';
+      return;
+    }
+    if (!AUTH_TOKEN) { el.textContent = "log in to view tunnel status"; return; }
+    const status = await fetch(AGENT + "/api/cloudflare/status", { headers: authHeaders() }).then(r => r.json());
+    el.textContent = status.tunnels.length
+      ? status.tunnels.map(t => `${t.name}: ${t.status}`).join(", ")
+      : "No tunnels configured yet.";
+  } catch (e) { /* agent offline */ }
+}
+
+loadCloudflare();  // unauthenticated availability check runs immediately
+setInterval(() => { loadWebsites(); loadStorage(); loadApps(); }, 5000);
+</script>
+</body>
+</html>
