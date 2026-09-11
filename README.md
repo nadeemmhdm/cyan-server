@@ -84,6 +84,7 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 - Configurable storage root (works the same whether it's `D:\CyanStorage`, `/mnt/storage/cyan`, or `/Users/shared/CyanStorage`)
 - Upload/download, folders, quotas, and **expiring share links**
 - Path-traversal protection enforced at the filesystem-resolution layer
+- **Trash / recycle bin** — deletions aren't immediate. Deleted files move to a 30-day trash, restorable with one command (`cyan trash restore <id>`), auto-purged in the background after 30 days, or emptied on demand (`--permanent` skips trash entirely for anything you genuinely want gone right away)
 
 ### Application manager
 - Install apps from a YAML manifest (Docker or Docker Compose)
@@ -173,7 +174,8 @@ cyan update             Check for / apply updates; --auto on|off for background 
 cyan health             Raw agent health check
 
 cyan web list|create|deploy|stop|logs
-cyan storage list|usage|mkdir|share
+cyan storage list|usage|mkdir|share|delete
+cyan trash list|restore|empty
 cyan apps list|install|start|stop
 cyan tunnel status|create
 ```
@@ -237,6 +239,7 @@ Everything in the table below was exercised against a **live agent process** —
 | App manager (requirement validation, pass + reject cases) | ✅ Live |
 | Auth (login, lockout, rate limit, audit log) | ✅ Live |
 | Recovery (`cyan up`, auto-recovery on startup) | ✅ Live — including the PID-reuse regression fix |
+| Trash / recycle bin (delete → restore, permanent delete, expiry purge) | ✅ Live — full round trip tested (delete, list, restore, content-integrity check, permanent delete, empty) |
 | Auto-update (check, config) | ✅ Live |
 | Cloudflare Tunnel | ⚠️ Real `cloudflared` wrapper, untestable in the build sandbox (no binary, no network route to Cloudflare) |
 | Windows/macOS adapters | ⚠️ Real code, unverified on real hosts |
@@ -246,6 +249,7 @@ Everything in the table below was exercised against a **live agent process** —
 
 ## 🗺️ Roadmap
 
+- [ ] Trash/recycle bin for websites and databases (currently storage only)
 - [ ] Windows/macOS live verification
 - [ ] Cloudflare Tunnel live verification
 - [ ] Node/Python site type live verification

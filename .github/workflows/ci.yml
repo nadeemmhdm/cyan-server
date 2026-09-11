@@ -22,3 +22,5 @@ jobs:
         run: python3 tests/test_services.py
       - name: Run recovery tests
         run: python3 tests/test_recovery.py
+      - name: Run trash tests
+        run: python3 tests/test_trash.py

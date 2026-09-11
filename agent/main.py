@@ -34,8 +34,9 @@ from api.web_routes import router as web_router
 from api.storage_routes import router as storage_router
 from api.apps_routes import router as apps_router
 from api.cloudflare_routes import router as cloudflare_router
+from api.trash_routes import router as trash_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.3.1")
+app = FastAPI(title="Cyan Server Agent", version="0.3.2")
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -51,6 +52,7 @@ app.include_router(web_router)
 app.include_router(storage_router)
 app.include_router(apps_router)
 app.include_router(cloudflare_router)
+app.include_router(trash_router)
 
 _START_TIME = time.time()
 
@@ -91,6 +93,9 @@ def _startup():
 
     # Auto-update background thread (off by auto-apply default, on by auto-check default)
     app.state.update_stop_event = start_auto_update_thread()
+
+    from trash.manager import start_auto_purge_thread
+    app.state.trash_stop_event = start_auto_purge_thread()
 
 
 @app.on_event("shutdown")

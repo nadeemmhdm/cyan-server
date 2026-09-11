@@ -61,6 +61,22 @@ def _safe_path(relative: str) -> Path:
     return candidate
 
 
+def restore_from_trash(trash_id: int) -> str:
+    """Restore a storage item back to its original location. Raises if
+    something now occupies that path (caller should catch and let the
+    user choose a different destination if needed)."""
+    from trash.manager import restore as trash_restore, get_trash_item, TrashError
+    item = get_trash_item(trash_id)
+    if item.item_type != "storage":
+        raise StorageError(f"Trash item {trash_id} is not a storage item")
+    restore_to = _safe_path(item.original_path)
+    try:
+        trash_restore(trash_id, restore_to)
+    except TrashError as e:
+        raise StorageError(str(e))
+    return item.original_path
+
+
 def usage_gb() -> float:
     root = get_root()
     total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file())
@@ -99,14 +115,23 @@ def make_dir(relative: str) -> None:
     target.mkdir(parents=True, exist_ok=True)
 
 
-def delete_path(relative: str) -> None:
+def delete_path(relative: str, permanent: bool = False) -> None:
+    """By default, moves the file/folder to trash (30-day retention,
+    restorable via `cyan trash restore`) instead of deleting it outright.
+    Pass permanent=True to skip trash entirely."""
     target = _safe_path(relative)
     if not target.exists():
         raise StorageError("Path does not exist")
-    if target.is_dir():
-        shutil.rmtree(target)
-    else:
-        target.unlink()
+
+    if permanent:
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        return
+
+    from trash.manager import move_to_trash
+    move_to_trash("storage", target.name, relative, target)
 
 
 def save_upload(relative_dir: str, filename: str, content: bytes) -> None:

@@ -37,10 +37,10 @@ def mkdir(req: MkdirRequest, _=Depends(require_auth)):
 
 
 @router.delete("/item")
-def delete_item(path: str, _=Depends(require_auth)):
+def delete_item(path: str, permanent: bool = False, _=Depends(require_auth)):
     try:
-        storage_manager.delete_path(path)
-        return {"success": True}
+        storage_manager.delete_path(path, permanent=permanent)
+        return {"success": True, "permanent": permanent}
     except storage_manager.StorageError as e:
         raise HTTPException(400, str(e))
 

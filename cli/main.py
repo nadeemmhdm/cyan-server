@@ -449,6 +449,55 @@ def storage_share(path: str, expires_hours: float = 24):
     console.print(f"URL: {AGENT_BASE}/api/storage/share/{result['token']}")
 
 
+@storage_app.command("delete")
+def storage_delete(path: str, permanent: bool = typer.Option(False, "--permanent", help="Skip trash, delete immediately.")):
+    _agent_post(f"/api/storage/item?path={path}" + ("&permanent=true" if permanent else ""),
+                auth=True, method="DELETE")
+    if permanent:
+        console.print(f"[yellow]Permanently deleted {path}[/yellow]")
+    else:
+        console.print(f"[green]✓ Moved {path} to trash[/green] (restorable for 30 days — cyan trash list)")
+
+
+# --- Trash / Recycle Bin -------------------------------------------------------------
+
+trash_app = typer.Typer(help="Recover or permanently remove deleted items (30-day retention).")
+app.add_typer(trash_app, name="trash")
+
+
+@trash_app.command("list")
+def trash_list():
+    items = _agent_get("/api/trash", auth=True)
+    if not items:
+        console.print("Trash is empty.")
+        return
+    table = Table(title="Trash")
+    for col in ("ID", "Type", "Name", "Deleted", "Expires"):
+        table.add_column(col)
+    for i in items:
+        table.add_row(str(i["id"]), i["item_type"], i["name"],
+                       i["deleted_at"][:19].replace("T", " "),
+                       i["expires_at"][:19].replace("T", " "))
+    console.print(table)
+
+
+@trash_app.command("restore")
+def trash_restore_cmd(trash_id: int):
+    result = _agent_post(f"/api/trash/{trash_id}/restore", auth=True)
+    console.print(f"[green]✓ Restored to {result['restored_to']}[/green]")
+
+
+@trash_app.command("empty")
+def trash_empty(yes: bool = typer.Option(False, "--yes", help="Skip confirmation.")):
+    if not yes:
+        confirm = typer.prompt("Type 'empty' to permanently delete everything in trash")
+        if confirm != "empty":
+            console.print("Aborted.")
+            raise typer.Exit(code=1)
+    result = _agent_post("/api/trash/empty", auth=True)
+    console.print(f"[green]✓ Permanently deleted {len(result['deleted'])} item(s)[/green]")
+
+
 # --- Applications -------------------------------------------------------------
 
 apps_app = typer.Typer(help="Manage installed applications.")

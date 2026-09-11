@@ -150,6 +150,18 @@ class UpdateConfig(Base):
     last_check_result = Column(String, nullable=True)  # up_to_date | update_available | error
 
 
+class TrashItem(Base):
+    __tablename__ = "trash_items"
+    id = Column(Integer, primary_key=True)
+    item_type = Column(String, nullable=False)     # storage | website | database
+    original_path = Column(String, nullable=False)  # where it lived (relative, for storage)
+    trash_path = Column(String, nullable=False)      # where the content actually is now
+    name = Column(String, nullable=False)              # display name
+    metadata_json = Column(Text, default="{}")          # type-specific extra info (site config, etc.)
+    deleted_at = Column(DateTime, default=utcnow)
+    expires_at = Column(DateTime, nullable=False)         # deleted_at + retention period
+
+
 def init_db():
     Base.metadata.create_all(engine)
 
