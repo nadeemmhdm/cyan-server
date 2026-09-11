@@ -5,6 +5,7 @@ below reflects real agent state — nothing here is simulated output.
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 import urllib.error
@@ -23,6 +24,30 @@ console = Console()
 
 AGENT_BASE = "http://localhost:7331"
 TOKEN_PATH = Path.home() / ".cyan-server" / ".cyan_cli_token"
+PIDFILE_PATH = Path.home() / ".cyan-server" / "agent.pid"
+
+
+def _write_pidfile(pid: int) -> None:
+    PIDFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PIDFILE_PATH.write_text(str(pid))
+
+
+def _read_pidfile() -> int | None:
+    if not PIDFILE_PATH.exists():
+        return None
+    try:
+        return int(PIDFILE_PATH.read_text().strip())
+    except ValueError:
+        return None
+
+
+def _process_alive(pid: int) -> bool:
+    import os as _os
+    try:
+        _os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, PermissionError, OSError):
+        return False
 
 
 def _load_token() -> str | None:
@@ -142,11 +167,15 @@ def setup():
 def start():
     """Start the Cyan Server agent (API + dashboard, one process)."""
     import subprocess
+    existing_pid = _read_pidfile()
+    if existing_pid and _process_alive(existing_pid):
+        console.print(f"[yellow]Agent already running (pid {existing_pid})[/yellow]")
+        return
     agent_path = Path(__file__).resolve().parent.parent / "agent" / "main.py"
     console.print("Starting Cyan Agent...")
-    subprocess.Popen([sys.executable, str(agent_path)],
-                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    for _ in range(10):
+    proc = subprocess.Popen([sys.executable, str(agent_path)],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(20):
         try:
             urllib.request.urlopen(f"{AGENT_BASE}/api/health", timeout=1)
             console.print(f"[green]✓ Agent running at {AGENT_BASE}[/green]")
@@ -154,6 +183,37 @@ def start():
         except (urllib.error.URLError, ConnectionRefusedError):
             time.sleep(0.5)
     console.print("[red]✗ Agent did not start in time. Check logs.[/red]")
+
+
+@app.command()
+def stop():
+    """Stop the running Cyan Server agent."""
+    pid = _read_pidfile()
+    if not pid or not _process_alive(pid):
+        console.print("[yellow]No running agent found (pidfile missing or stale).[/yellow]")
+        return
+    import signal
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError) as e:
+        console.print(f"[red]✗ Could not stop agent (pid {pid}): {e}[/red]")
+        return
+    for _ in range(10):
+        if not _process_alive(pid):
+            console.print(f"[green]✓ Agent stopped (was pid {pid})[/green]")
+            return
+        time.sleep(0.3)
+    console.print(f"[yellow]Sent stop signal to pid {pid}, but it's still shutting down.[/yellow]")
+
+
+@app.command()
+def restart():
+    """Restart the agent in one command. Automatic recovery (see `cyan up`)
+    means anything that was running comes back up as part of this."""
+    console.print("Restarting Cyan Server...")
+    stop()
+    time.sleep(1)
+    start()
 
 
 @app.command()
@@ -211,6 +271,58 @@ def up():
 
 
 @app.command()
+def uninstall(yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt.")):
+    """Remove Cyan Server: stops the agent, deletes the install directory
+    and all local data (database, storage, secrets). Deployed sites/apps
+    on the host (Docker containers, Caddy config) are also torn down.
+    Asks for confirmation unless --yes is passed."""
+    data_dir = Path.home() / ".cyan-server"
+    install_dir = Path(__file__).resolve().parent.parent
+
+    console.print("[bold red]This will:[/bold red]")
+    console.print(f"  • Stop the Cyan Server agent")
+    console.print(f"  • Stop every deployed website and application")
+    console.print(f"  • Delete {data_dir} (database, storage, secrets, logs)")
+    console.print(f"  • Delete {install_dir} (the Cyan Server code itself)")
+    console.print("[bold]This cannot be undone.[/bold]")
+
+    if not yes:
+        confirm = typer.prompt("Type 'uninstall' to confirm")
+        if confirm != "uninstall":
+            console.print("Aborted — nothing was removed.")
+            raise typer.Exit(code=1)
+
+    # Best-effort teardown of running services before deleting anything.
+    try:
+        if _load_token():
+            for site in _agent_get("/api/web", auth=True):
+                if site["status"] == "running":
+                    try:
+                        _agent_post(f"/api/web/{site['name']}/stop", auth=True)
+                    except Exception:
+                        pass
+            for a in _agent_get("/api/apps", auth=True):
+                if a["status"] == "running":
+                    try:
+                        _agent_post(f"/api/apps/{a['name']}/stop", auth=True)
+                    except Exception:
+                        pass
+    except Exception:
+        pass  # agent may already be down — don't block the uninstall on this
+
+    stop()
+
+    import shutil
+    if data_dir.exists():
+        shutil.rmtree(data_dir, ignore_errors=True)
+        console.print(f"[green]✓ Removed {data_dir}[/green]")
+
+    console.print(f"\n[green]✓ Cyan Server stopped and data removed.[/green]")
+    console.print(f"To finish, delete the install directory yourself: [bold]rm -rf {install_dir}[/bold]")
+    console.print("(not done automatically, since that's the directory this command is running from)")
+
+
+@app.command()
 def health():
     """Agent health check."""
     result = _agent_get("/api/health")
@@ -224,12 +336,25 @@ def ports():
     console.print(f"Open ports: {result['open_ports']}")
 
 
+def _prompt_password() -> str:
+    """hide_input=True depends on the terminal supporting echo control,
+    which fails (and previously crashed the whole login with an Abort) on
+    some terminals/SSH sessions/Windows consoles. Fall back to a visible
+    prompt rather than dying — a visible local password prompt beats a
+    broken login."""
+    try:
+        return typer.prompt("Password", hide_input=True)
+    except Exception:
+        console.print("[yellow]Couldn't hide input on this terminal — password will be visible as you type.[/yellow]")
+        return typer.prompt("Password", hide_input=False)
+
+
 @app.command()
-def login(username: str = typer.Option("admin"),
-          password: str = typer.Option(None, help="If omitted, you'll be prompted.")):
-    """Log in to the local agent and cache a session token."""
+def login(password: str = typer.Option(None, help="If omitted, you'll be prompted (username is always 'admin' for now).")):
+    """Log in to the local agent (http://localhost:7331) and cache a session token."""
+    username = "admin"
     if password is None:
-        password = typer.prompt("Password", hide_input=True)
+        password = _prompt_password()
     result = _agent_post("/api/auth/login", {"username": username, "password": password})
     _save_token(result["access_token"])
     console.print(f"[green]✓ Logged in as {username} ({result['role']})[/green]")

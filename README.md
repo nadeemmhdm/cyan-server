@@ -58,7 +58,7 @@ python3 agent/main.py     # ONE command — API + dashboard both come up on :733
 Then from the CLI:
 
 ```bash
-cyan login --username admin --password "<printed on first agent start>"
+cyan login --password "<printed on first agent start>"   # username is always admin
 cyan setup                    # real hardware/OS/network detection
 cyan web create mysite static folder ./my-site 8080
 cyan web deploy mysite        # live behind Caddy in seconds
@@ -161,7 +161,11 @@ The dashboard is a single responsive page — no app to install, works in any mo
 ## 📟 CLI reference
 
 ```
-cyan login              Log in and cache a session token
+cyan start              Start the agent (API + dashboard, one process)
+cyan stop               Stop the running agent
+cyan restart            Restart in one command (recovery brings services back up)
+cyan uninstall           Remove Cyan Server — asks for typed confirmation first
+cyan login              Log in (password only — username is always admin) and cache a session token
 cyan status             Live agent + system status
 cyan setup              Run hardware/OS/network detection
 cyan up                 Recover any site/app that should be running but isn't
@@ -172,6 +176,11 @@ cyan web list|create|deploy|stop|logs
 cyan storage list|usage|mkdir|share
 cyan apps list|install|start|stop
 cyan tunnel status|create
+```
+
+Custom admin credentials at first run (instead of the auto-generated password):
+```bash
+CYAN_ADMIN_USER=myname CYAN_ADMIN_PASSWORD=mypassword cyan start
 ```
 
 ---

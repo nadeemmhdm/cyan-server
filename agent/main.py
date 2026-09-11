@@ -6,6 +6,7 @@ live values from core.detection / platform_impl adapters.
 """
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -34,7 +35,7 @@ from api.storage_routes import router as storage_router
 from api.apps_routes import router as apps_router
 from api.cloudflare_routes import router as cloudflare_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.3.0")
+app = FastAPI(title="Cyan Server Agent", version="0.3.1")
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -60,8 +61,17 @@ def _startup():
     the DB, auth, and every service module (web/storage/apps/cloudflare).
     Creates the schema and a first admin account if this is a fresh
     install."""
+    pidfile = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "agent.pid"
+    pidfile.parent.mkdir(parents=True, exist_ok=True)
+    pidfile.write_text(str(os.getpid()))
+
     init_db()
-    username, generated_password = ensure_default_admin()
+    # Custom admin credentials at first-run setup time, if provided —
+    # otherwise a random password is generated and shown once, as before.
+    username, generated_password = ensure_default_admin(
+        username=os.environ.get("CYAN_ADMIN_USER", "admin"),
+        password=os.environ.get("CYAN_ADMIN_PASSWORD"),
+    )
     if generated_password:
         print("=" * 60)
         print(f"  First run — admin account created")
@@ -81,6 +91,16 @@ def _startup():
 
     # Auto-update background thread (off by auto-apply default, on by auto-check default)
     app.state.update_stop_event = start_auto_update_thread()
+
+
+@app.on_event("shutdown")
+def _shutdown():
+    pidfile = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "agent.pid"
+    try:
+        if pidfile.exists() and pidfile.read_text().strip() == str(os.getpid()):
+            pidfile.unlink()
+    except OSError:
+        pass
 
 
 @app.get("/api/health")
