@@ -35,8 +35,9 @@ from api.storage_routes import router as storage_router
 from api.apps_routes import router as apps_router
 from api.cloudflare_routes import router as cloudflare_router
 from api.trash_routes import router as trash_router
+from api.database_routes import router as database_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.3.3")
+app = FastAPI(title="Cyan Server Agent", version="0.4.0")
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -53,6 +54,7 @@ app.include_router(storage_router)
 app.include_router(apps_router)
 app.include_router(cloudflare_router)
 app.include_router(trash_router)
+app.include_router(database_router)
 
 _START_TIME = time.time()
 

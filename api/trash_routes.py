@@ -6,6 +6,7 @@ from security.dependencies import require_auth
 from trash import manager as trash_manager
 from storage.manager import restore_from_trash as storage_restore, StorageError
 from web.manager import restore_site as web_restore_site, SiteError
+from database.manager import restore_database as db_restore, DatabaseError
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
 
@@ -33,8 +34,11 @@ def restore_item(trash_id: int, _=Depends(require_auth)):
         if item.item_type == "website":
             site = web_restore_site(trash_id)
             return {"success": True, "restored_to": site.name, "status": site.status}
+        if item.item_type == "database":
+            db = db_restore(trash_id)
+            return {"success": True, "restored_to": db.name, "engine": db.engine}
         raise HTTPException(400, f"Restore not yet implemented for item_type '{item.item_type}'")
-    except (trash_manager.TrashError, StorageError, SiteError) as e:
+    except (trash_manager.TrashError, StorageError, SiteError, DatabaseError) as e:
         raise HTTPException(400, str(e))
 
 

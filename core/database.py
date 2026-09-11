@@ -162,6 +162,15 @@ class TrashItem(Base):
     expires_at = Column(DateTime, nullable=False)         # deleted_at + retention period
 
 
+class ManagedDatabase(Base):
+    __tablename__ = "managed_databases"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    engine = Column(String, nullable=False)          # sqlite | postgres
+    connection_info = Column(Text, nullable=False)     # JSON: path (sqlite) or dsn parts (postgres)
+    created_at = Column(DateTime, default=utcnow)
+
+
 def init_db():
     Base.metadata.create_all(engine)
 

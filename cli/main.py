@@ -524,6 +524,71 @@ def trash_empty(yes: bool = typer.Option(False, "--yes", help="Skip confirmation
     console.print(f"[green]✓ Permanently deleted {len(result['deleted'])} item(s)[/green]")
 
 
+# --- Database -------------------------------------------------------------
+
+db_app = typer.Typer(help="Manage SQL databases (SQLite always available; Postgres if installed).")
+app.add_typer(db_app, name="db")
+
+
+@db_app.command("list")
+def db_list():
+    dbs = _agent_get("/api/database", auth=True)
+    if not dbs:
+        console.print("No databases yet. Create one with: cyan db create <name>")
+        return
+    table = Table(title="Databases")
+    for col in ("Name", "Engine", "Created"):
+        table.add_column(col)
+    for d in dbs:
+        table.add_row(d["name"], d["engine"], d["created_at"][:19].replace("T", " "))
+    console.print(table)
+
+
+@db_app.command("create")
+def db_create(name: str, engine: str = typer.Option("sqlite", help="sqlite or postgres")):
+    result = _agent_post("/api/database", {"name": name, "engine": engine}, auth=True)
+    console.print(f"[green]✓ Database '{result['name']}' created ({result['engine']})[/green]")
+    console.print(f"  {result['connection_info']}")
+
+
+@db_app.command("status")
+def db_status(name: str):
+    result = _agent_get(f"/api/database/{name}/status", auth=True)
+    console.print(f"Engine: {result['engine']}")
+    console.print(f"Size: {result['size_bytes']} bytes")
+    console.print(f"Tables: {result['tables'] or '(none yet)'}")
+    if "row_counts" in result and result["row_counts"]:
+        for table, count in result["row_counts"].items():
+            console.print(f"  {table}: {count} row(s)")
+
+
+@db_app.command("query")
+def db_query(name: str, sql: str):
+    """Run a management SQL statement against a database. Admin only."""
+    result = _agent_post(f"/api/database/{name}/query", {"sql": sql}, auth=True)
+    if result.get("rows"):
+        t = Table()
+        for col in result["columns"]:
+            t.add_column(col)
+        for row in result["rows"]:
+            t.add_row(*[str(row[c]) for c in result["columns"]])
+        console.print(t)
+    elif "rowcount" in result:
+        if result["rowcount"] == -1:
+            console.print("[green]OK[/green]")  # DDL (CREATE TABLE etc.) — sqlite3 doesn't report a row count for these
+        else:
+            console.print(f"[green]OK — {result['rowcount']} row(s) affected[/green]")
+    else:
+        console.print(result.get("output", result))
+
+
+@db_app.command("delete")
+def db_delete(name: str, permanent: bool = typer.Option(False, "--permanent", help="Skip trash (SQLite only — Postgres drops are always permanent).")):
+    _agent_post(f"/api/database/{name}?permanent={'true' if permanent else 'false'}", auth=True, method="DELETE")
+    console.print(f"[yellow]Database '{name}' deleted[/yellow]" +
+                  ("" if permanent else " (SQLite: restorable for 30 days — cyan trash list)"))
+
+
 # --- Applications -------------------------------------------------------------
 
 apps_app = typer.Typer(help="Manage installed applications.")

@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.3.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.4.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -87,6 +87,12 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 - Upload/download, folders, quotas, and **expiring share links**
 - Path-traversal protection enforced at the filesystem-resolution layer
 - **Trash / recycle bin** — deletions aren't immediate. Deleted files move to a 30-day trash, restorable with one command (`cyan trash restore <id>`), auto-purged in the background after 30 days, or emptied on demand (`--permanent` skips trash entirely for anything you genuinely want gone right away)
+
+### Database server
+- **SQL database provisioning** — `cyan db create <name>` creates a real, isolated SQLite database file (no external service needed); Postgres is supported the same way if it's installed on the host
+- Run management queries directly — `cyan db query <name> "<sql>"` — admin-only, same auth gate as everything destructive
+- **Live status** — real file size, real table list, real per-table row counts, not cached
+- Trash-aware deletion for SQLite databases (30-day restore, same as storage/websites); Postgres drops are permanent (there's no meaningful "trash" for a live SQL server without pg_dump-based snapshotting, which isn't built yet)
 
 ### Application manager
 - Install apps from a YAML manifest (Docker or Docker Compose)
@@ -180,6 +186,7 @@ cyan health             Raw agent health check
 cyan web list|create|deploy|stop|logs|domain|delete
 cyan storage list|usage|mkdir|share|delete
 cyan trash list|restore|empty
+cyan db list|create|status|query|delete
 cyan apps list|install|start|stop
 cyan tunnel status|create
 ```
@@ -245,6 +252,8 @@ Everything in the table below was exercised against a **live agent process** —
 | Recovery (`cyan up`, auto-recovery on startup) | ✅ Live — including the PID-reuse regression fix |
 | Trash / recycle bin (delete → restore, permanent delete, expiry purge) | ✅ Live — storage AND websites now, full round trip tested for both (including a real domain/subdomain-preservation check on website restore) |
 | Domain/subdomain connection (`cyan web domain`) | ✅ Live — verified against the actual generated Caddyfile, tested with both a root domain and a subdomain |
+| Database manager (SQLite: create, query, status, delete/restore) | ✅ Live — full round trip including a real CREATE TABLE + INSERT + data-integrity check across delete/restore |
+| Database manager (Postgres) | ⚠️ Real code against the real `psql`/`createdb`/`dropdb` surface, unverified — the build sandbox's package mirror returned 404s for every Postgres package at build time |
 | Auto-update (check, config) | ✅ Live |
 | Cloudflare Tunnel | ⚠️ Real `cloudflared` wrapper, untestable in the build sandbox (no binary, no network route to Cloudflare) |
 | Windows/macOS adapters | ⚠️ Real code, unverified on real hosts |
@@ -254,7 +263,8 @@ Everything in the table below was exercised against a **live agent process** —
 
 ## 🗺️ Roadmap
 
-- [ ] Trash/recycle bin for databases (storage and websites now covered)
+- [ ] Postgres live verification (real code, needs a host where the package actually installs)
+- [ ] Postgres trash/snapshot-based delete (currently always permanent)
 - [ ] Windows/macOS live verification
 - [ ] Cloudflare Tunnel live verification
 - [ ] Node/Python site type live verification

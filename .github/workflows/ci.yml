@@ -26,3 +26,5 @@ jobs:
         run: python3 tests/test_trash.py
       - name: Run website-trash tests
         run: python3 tests/test_web_trash.py
+      - name: Run database tests
+        run: python3 tests/test_database.py
