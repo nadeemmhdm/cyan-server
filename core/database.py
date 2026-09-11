@@ -171,6 +171,18 @@ class ManagedDatabase(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
+class BackupConfig(Base):
+    __tablename__ = "backup_config"
+    id = Column(Integer, primary_key=True)
+    destination_dir = Column(String, nullable=True)   # None = default (~/.cyan-server/backups)
+    retention_count = Column(Integer, default=7)
+    interval_hours = Column(Integer, default=24)
+    auto_enabled = Column(Boolean, default=True)         # backups are non-destructive, on by default
+    include_storage = Column(Boolean, default=False)      # off by default: storage can be large
+    last_backup_at = Column(DateTime, nullable=True)
+    last_backup_result = Column(String, nullable=True)
+
+
 def init_db():
     Base.metadata.create_all(engine)
 

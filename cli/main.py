@@ -524,6 +524,100 @@ def trash_empty(yes: bool = typer.Option(False, "--yes", help="Skip confirmation
     console.print(f"[green]✓ Permanently deleted {len(result['deleted'])} item(s)[/green]")
 
 
+# --- Backup / Restore -------------------------------------------------------------
+
+backup_app = typer.Typer(help="Backup and restore the whole install (config, sites, databases).")
+app.add_typer(backup_app, name="backup")
+
+
+@backup_app.command("create")
+def backup_create(include_storage: bool = typer.Option(False, "--include-storage", help="Also back up the storage server's files (can be large).")):
+    result = _agent_post("/api/backup", {"include_storage": include_storage}, auth=True)
+    console.print(f"[green]✓ Backup created: {result['filename']}[/green]")
+
+
+@backup_app.command("list")
+def backup_list():
+    backups = _agent_get("/api/backup", auth=True)
+    if not backups:
+        console.print("No backups yet. Create one with: cyan backup create")
+        return
+    table = Table(title="Backups")
+    for col in ("Filename", "Size", "Created"):
+        table.add_column(col)
+    for b in backups:
+        size_mb = b["size_bytes"] / (1024 * 1024)
+        table.add_row(b["filename"], f"{size_mb:.2f} MB", b["created_at"][:19].replace("T", " "))
+    console.print(table)
+
+
+@backup_app.command("config")
+def backup_config(
+    auto: str = typer.Option(None, help="on|off — background auto-backup"),
+    retention: int = typer.Option(None, help="How many recent backups to keep"),
+    interval_hours: int = typer.Option(None, help="Hours between automatic backups"),
+    include_storage: str = typer.Option(None, help="on|off — include storage files in backups"),
+):
+    if all(v is None for v in (auto, retention, interval_hours, include_storage)):
+        cfg = _agent_get("/api/backup/config", auth=True)
+        console.print(cfg)
+        return
+    payload = {}
+    if auto is not None:
+        payload["auto_enabled"] = auto == "on"
+    if retention is not None:
+        payload["retention_count"] = retention
+    if interval_hours is not None:
+        payload["interval_hours"] = interval_hours
+    if include_storage is not None:
+        payload["include_storage"] = include_storage == "on"
+    result = _agent_post("/api/backup/config", payload, auth=True)
+    console.print(f"[green]✓ Backup config updated[/green]")
+    console.print(result)
+
+
+@backup_app.command("restore")
+def backup_restore(filename: str, yes: bool = typer.Option(False, "--yes", help="Skip confirmation.")):
+    """Restores a backup — this REPLACES the current database, Caddy
+    config, sites, and managed databases. The agent is stopped first
+    (overwriting cyan.db under a live connection doesn't take effect
+    until reconnect anyway), and your current state is preserved in a
+    .pre-restore-<timestamp> folder rather than deleted, in case you
+    need to undo it."""
+    console.print("[bold red]This will replace your current database, sites, and databases "
+                   "with the contents of this backup.[/bold red]")
+    console.print("Your current state will be preserved in a .pre-restore-<timestamp> folder, not deleted.")
+    if not yes:
+        confirm = typer.prompt("Type 'restore' to confirm")
+        if confirm != "restore":
+            console.print("Aborted.")
+            raise typer.Exit(code=1)
+
+    console.print("Stopping agent...")
+    stop()
+
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from backup.manager import restore_backup, list_backups, BackupError
+
+    backups = {b["filename"]: b["path"] for b in list_backups()}
+    if filename not in backups:
+        console.print(f"[red]✗ Backup '{filename}' not found. Run 'cyan backup list' first.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        result = restore_backup(Path(backups[filename]))
+    except BackupError as e:
+        console.print(f"[red]✗ {e}[/red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]✓ Restored from {filename}[/green]")
+    if result["preserved_previous_state_at"]:
+        console.print(f"  Previous state preserved at: {result['preserved_previous_state_at']}")
+    console.print("Starting agent (automatic recovery will bring sites/apps back up)...")
+    start()
+
+
 # --- Database -------------------------------------------------------------
 
 db_app = typer.Typer(help="Manage SQL databases (SQLite always available; Postgres if installed).")

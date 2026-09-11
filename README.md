@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.4.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.5.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -87,6 +87,12 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 - Upload/download, folders, quotas, and **expiring share links**
 - Path-traversal protection enforced at the filesystem-resolution layer
 - **Trash / recycle bin** — deletions aren't immediate. Deleted files move to a 30-day trash, restorable with one command (`cyan trash restore <id>`), auto-purged in the background after 30 days, or emptied on demand (`--permanent` skips trash entirely for anything you genuinely want gone right away)
+
+### Backup & restore
+- **Point-in-time snapshots** — `cyan backup create` tars up the full config database (via SQLite's own backup API for a consistent snapshot, not a raw file copy that could catch a torn write), the Caddy config, every deployed site's source, and every managed SQLite database. Storage files are opt-in (`--include-storage`) since they can be large
+- **Automatic backups** — on by default, configurable interval and retention (`cyan backup config`)
+- **Restore** — `cyan backup restore <file>` stops the agent, extracts the archive, and restarts (automatic recovery brings sites back up). Your pre-restore state is moved aside, not deleted, so a bad restore is itself undoable
+- Archive extraction is tarbomb/path-traversal-safe — every member is validated before anything touches disk
 
 ### Database server
 - **SQL database provisioning** — `cyan db create <name>` creates a real, isolated SQLite database file (no external service needed); Postgres is supported the same way if it's installed on the host
@@ -186,6 +192,7 @@ cyan health             Raw agent health check
 cyan web list|create|deploy|stop|logs|domain|delete
 cyan storage list|usage|mkdir|share|delete
 cyan trash list|restore|empty
+cyan backup create|list|restore|config
 cyan db list|create|status|query|delete
 cyan apps list|install|start|stop
 cyan tunnel status|create
@@ -254,6 +261,7 @@ Everything in the table below was exercised against a **live agent process** —
 | Domain/subdomain connection (`cyan web domain`) | ✅ Live — verified against the actual generated Caddyfile, tested with both a root domain and a subdomain |
 | Database manager (SQLite: create, query, status, delete/restore) | ✅ Live — full round trip including a real CREATE TABLE + INSERT + data-integrity check across delete/restore |
 | Database manager (Postgres) | ⚠️ Real code against the real `psql`/`createdb`/`dropdb` surface, unverified — the build sandbox's package mirror returned 404s for every Postgres package at build time |
+| Backup & restore | ✅ Live — full disaster-recovery test: real site + real database created, explicit backup taken, **actual `cyan backup restore` run** (stops agent, extracts, restarts), site auto-redeployed and serving again, database row data intact, pre-restore state genuinely preserved on disk (not deleted). A stale-connection-pool bug was caught and fixed during this: `attempt to write a readonly database` after a second restore in the same process, fixed by disposing the SQLAlchemy engine's pool as part of restore |
 | Auto-update (check, config) | ✅ Live |
 | Cloudflare Tunnel | ⚠️ Real `cloudflared` wrapper, untestable in the build sandbox (no binary, no network route to Cloudflare) |
 | Windows/macOS adapters | ⚠️ Real code, unverified on real hosts |
@@ -263,6 +271,7 @@ Everything in the table below was exercised against a **live agent process** —
 
 ## 🗺️ Roadmap
 
+- [ ] Backup to remote destinations (S3-compatible, SFTP, network share — currently local filesystem only)
 - [ ] Postgres live verification (real code, needs a host where the package actually installs)
 - [ ] Postgres trash/snapshot-based delete (currently always permanent)
 - [ ] Windows/macOS live verification

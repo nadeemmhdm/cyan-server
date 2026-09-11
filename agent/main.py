@@ -36,8 +36,9 @@ from api.apps_routes import router as apps_router
 from api.cloudflare_routes import router as cloudflare_router
 from api.trash_routes import router as trash_router
 from api.database_routes import router as database_router
+from api.backup_routes import router as backup_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.4.0")
+app = FastAPI(title="Cyan Server Agent", version="0.5.0")
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -55,6 +56,7 @@ app.include_router(apps_router)
 app.include_router(cloudflare_router)
 app.include_router(trash_router)
 app.include_router(database_router)
+app.include_router(backup_router)
 
 _START_TIME = time.time()
 
@@ -98,6 +100,9 @@ def _startup():
 
     from trash.manager import start_auto_purge_thread
     app.state.trash_stop_event = start_auto_purge_thread()
+
+    from backup.manager import start_auto_backup_thread
+    app.state.backup_stop_event = start_auto_backup_thread()
 
 
 @app.on_event("shutdown")
