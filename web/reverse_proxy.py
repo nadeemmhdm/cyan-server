@@ -16,11 +16,22 @@ import httpx
 
 from core.database import Website
 
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-CADDYFILE_PATH = DATA_DIR / "Caddyfile"
 CADDY_ADMIN_URL = "http://localhost:2019"
 DASHBOARD_PORT = int(os.environ.get("CYAN_DASHBOARD_PORT", 7331))
+
+
+def _data_dir() -> Path:
+    """Re-read CYAN_DATA_DIR on every call rather than caching it at
+    import time — a cached path goes stale if CYAN_DATA_DIR changes
+    within a process (e.g. multiple test files sharing one pytest
+    process); caught via real Windows testing."""
+    d = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _caddyfile_path() -> Path:
+    return _data_dir() / "Caddyfile"
 
 
 class CaddyNotAvailable(RuntimeError):
@@ -32,13 +43,26 @@ def caddy_binary() -> str:
     if not path:
         raise CaddyNotAvailable(
             "caddy is not installed. Install it via the PackageManager "
-            "abstraction (plan_install('caddy')) before enabling web hosting."
+            "abstraction (plan_install('caddy')) before enabling web hosting. "
+            "On Windows: winget install CaddyServer.Caddy"
         )
     return path
 
 
 def render_caddyfile(sites: list[Website]) -> str:
     """Build a Caddyfile from live DB rows. No manual editing needed."""
+    data_dir = _data_dir()
+
+    # Global options block must come first, before any site block, and
+    # applies to the whole Caddy instance. skip_install_trust stops Caddy
+    # from trying to install a local root CA into the OS trust store for
+    # internal/.local hostnames — on Windows that triggers a blocking
+    # "Do you want to install this certificate?" modal dialog, which hangs
+    # any automated or headless run indefinitely. Caught via real Windows
+    # testing (a `caddy reload` call timing out after 15s waiting on a
+    # dialog no one was there to click).
+    global_opts = "{\n    skip_install_trust\n}\n\n"
+
     blocks = []
     for site in sites:
         if site.status != "running":
@@ -48,14 +72,13 @@ def render_caddyfile(sites: list[Website]) -> str:
             f"{host} {{\n"
             f"    reverse_proxy localhost:{site.port}\n"
             f"    log {{\n"
-            f"        output file {DATA_DIR}/logs/{site.name}.log\n"
+            f"        output file {data_dir}/logs/{site.name}.log\n"
             f"    }}\n"
             f"}}\n"
         )
     if not blocks:
-        # Minimal valid Caddyfile with just the admin API + a placeholder.
-        return "# Cyan Server managed Caddyfile — no active sites\n"
-    return "\n".join(blocks)
+        return global_opts + "# Cyan Server managed Caddyfile — no active sites\n"
+    return global_opts + "\n".join(blocks)
 
 
 def _pick_public_port(site: Website) -> int:
@@ -65,10 +88,11 @@ def _pick_public_port(site: Website) -> int:
 
 
 def write_caddyfile(sites: list[Website]) -> Path:
-    (DATA_DIR / "logs").mkdir(exist_ok=True)
+    (_data_dir() / "logs").mkdir(exist_ok=True)
     content = render_caddyfile(sites)
-    CADDYFILE_PATH.write_text(content)
-    return CADDYFILE_PATH
+    path = _caddyfile_path()
+    path.write_text(content)
+    return path
 
 
 def is_caddy_running() -> bool:
@@ -79,14 +103,29 @@ def is_caddy_running() -> bool:
         return False
 
 
-def start_caddy() -> subprocess.Popen:
-    """Start Caddy in the background using our managed Caddyfile."""
+def start_caddy(sites: list[Website] | None = None) -> subprocess.Popen:
+    """Start Caddy in the background using our managed Caddyfile.
+
+    Takes the currently-active sites so it can write the REAL config on
+    first start. Previously this always wrote an empty config first
+    (write_caddyfile([])) — harmless if Caddy had never run before, but
+    if reload_caddy() had already written the actual sites into the
+    Caddyfile moments earlier (e.g. Caddy crashed and this is a restart),
+    calling start_caddy() would silently wipe that real config back to
+    empty right before launching. Caught via real Windows testing. Now
+    this only writes a blank placeholder if no Caddyfile exists yet at
+    all — otherwise it starts Caddy with whatever's already on disk, or
+    with the sites passed in if you have them.
+    """
     binary = caddy_binary()
-    write_caddyfile([])  # ensure file exists before first start
-    log_path = DATA_DIR / "caddy.log"
+    if sites is not None:
+        write_caddyfile(sites)
+    elif not _caddyfile_path().exists():
+        write_caddyfile([])
+    log_path = _data_dir() / "caddy.log"
     log_file = open(log_path, "a")
     proc = subprocess.Popen(
-        [binary, "run", "--config", str(CADDYFILE_PATH), "--adapter", "caddyfile"],
+        [binary, "run", "--config", str(_caddyfile_path()), "--adapter", "caddyfile"],
         stdout=log_file, stderr=subprocess.STDOUT,
     )
     for _ in range(20):
@@ -101,11 +140,11 @@ def reload_caddy(sites: list[Website]) -> bool:
     via its admin API (no downtime, no manual restart)."""
     write_caddyfile(sites)
     if not is_caddy_running():
-        start_caddy()
+        start_caddy(sites)
         return True
     binary = caddy_binary()
     result = subprocess.run(
-        [binary, "reload", "--config", str(CADDYFILE_PATH), "--adapter", "caddyfile"],
+        [binary, "reload", "--config", str(_caddyfile_path()), "--adapter", "caddyfile"],
         capture_output=True, text=True, timeout=15,
     )
     return result.returncode == 0

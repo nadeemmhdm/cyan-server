@@ -15,9 +15,15 @@ import jwt
 
 from core.database import User, get_session
 
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-SECRET_PATH = DATA_DIR / ".cyan_secret"
+def _secret_path() -> Path:
+    """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
+    _data_dir() docstring for why a cached path is a real bug. This one
+    matters especially: a stale secret path could sign/verify JWTs
+    against the wrong install's secret entirely."""
+    d = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
+    d.mkdir(parents=True, exist_ok=True)
+    return d / ".cyan_secret"
+
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 12
@@ -26,12 +32,13 @@ JWT_EXPIRY_HOURS = 12
 def get_or_create_secret() -> str:
     """Persistent per-install secret, used to sign JWTs. Generated once,
     written with 0600 perms — this is what the installer also generates."""
-    if SECRET_PATH.exists():
-        return SECRET_PATH.read_text().strip()
+    secret_path = _secret_path()
+    if secret_path.exists():
+        return secret_path.read_text().strip()
     secret = secrets.token_hex(32)
-    SECRET_PATH.write_text(secret)
+    secret_path.write_text(secret)
     try:
-        SECRET_PATH.chmod(0o600)
+        secret_path.chmod(0o600)
     except OSError:
         pass  # best-effort on platforms without POSIX perms (Windows)
     return secret

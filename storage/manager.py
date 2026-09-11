@@ -15,7 +15,10 @@ from pathlib import Path
 
 from core.database import StorageConfig, ShareLink, get_session
 
-DEFAULT_ROOT = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "storage"
+def _default_root() -> Path:
+    """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
+    _data_dir() docstring for why a cached path is a real bug."""
+    return Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "storage"
 
 
 class StorageError(Exception):
@@ -26,7 +29,7 @@ def get_root() -> Path:
     session = get_session()
     try:
         cfg = session.query(StorageConfig).first()
-        root = Path(cfg.root_path) if cfg else DEFAULT_ROOT
+        root = Path(cfg.root_path) if cfg else _default_root()
     finally:
         session.close()
     root.mkdir(parents=True, exist_ok=True)

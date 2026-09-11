@@ -38,7 +38,7 @@ from api.trash_routes import router as trash_router
 from api.database_routes import router as database_router
 from api.backup_routes import router as backup_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.5.0")
+app = FastAPI(title="Cyan Server Agent", version="0.5.1")
 
 app.add_middleware(SecurityHeadersMiddleware)
 

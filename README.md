@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.5.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.5.1-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -76,7 +76,7 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 - **One CLI** (`cyan`) and **one dashboard**, served by a single agent process, for everything below
 
 ### Web hosting
-- Deploy static sites, Node.js, Python, or Docker-based sites from a folder, a git repo, or a Docker image
+- Deploy static sites, Node.js, Python, PHP, or React (build + serve), or Docker-based sites from a folder, a git repo, or a Docker image
 - Real **Caddy**-backed reverse proxy — Caddyfile generated from your sites and hot-reloaded via Caddy's admin API, no manual config editing
 - **Domain and subdomain connection** — `cyan web domain <site> <hostname>` connects (or changes, or clears) a hostname live, no redeploy needed; subdomains work exactly the same way as root domains
 - Per-site logs, start/stop/redeploy
@@ -236,10 +236,10 @@ One agent process (`agent/main.py`) owns hardware detection, every service modul
 | OS | Package manager | Service manager | Status |
 |---|---|---|---|
 | Linux | apt / dnf / yum / pacman / zypper | systemd | ✅ Tested live (this repo's CI runs on Ubuntu) |
-| Windows | winget / choco | `sc.exe` | ⚠️ Real code against real tooling, not yet run on an actual Windows host |
+| Windows | winget / choco | `sc.exe` | ✅ **Tested live on real Windows** by a contributor — 6 real bugs found and fixed (Caddy trust-store dialog hang, console encoding crash, stale-path bug affecting 9 modules, file-locking on redeploy, config-wipe on restart) — see commit history for the full list |
 | macOS | Homebrew | launchd | ⚠️ Real code against real tooling, not yet run on an actual Mac |
 
-If you run this on Windows or macOS, [issues](../../issues) reporting what worked (or didn't) are genuinely useful.
+If you run this on macOS, [issues](../../issues) reporting what worked (or didn't) are genuinely useful — Windows already got a real pass.
 
 ---
 
@@ -251,8 +251,10 @@ Everything in the table below was exercised against a **live agent process** —
 |---|---|
 | Hardware/OS detection | ✅ Live on Linux |
 | Single-command startup (agent + dashboard, one port) | ✅ Live |
-| Web hosting (static sites) | ✅ Live — deployed, served, logged, stopped |
+| Web hosting (static sites) | ✅ Live — deployed, served, logged, stopped, and redeployed-while-running (Windows file-lock case) |
+| Web hosting (react) | ✅ Live — real npm install + npm run build + serve the real output directory |
 | Web hosting (node/python/docker) | ⚠️ Implemented, not exercised live (no sample apps on hand during build) |
+| Web hosting (php) | ⚠️ Real code (PHP's built-in server), unverified — same broken package mirror that blocked Postgres also blocked php-cli in this sandbox |
 | Storage (upload/list/share/quota/traversal) | ✅ Live |
 | App manager (requirement validation, pass + reject cases) | ✅ Live |
 | Auth (login, lockout, rate limit, audit log) | ✅ Live |
@@ -264,17 +266,18 @@ Everything in the table below was exercised against a **live agent process** —
 | Backup & restore | ✅ Live — full disaster-recovery test: real site + real database created, explicit backup taken, **actual `cyan backup restore` run** (stops agent, extracts, restarts), site auto-redeployed and serving again, database row data intact, pre-restore state genuinely preserved on disk (not deleted). A stale-connection-pool bug was caught and fixed during this: `attempt to write a readonly database` after a second restore in the same process, fixed by disposing the SQLAlchemy engine's pool as part of restore |
 | Auto-update (check, config) | ✅ Live |
 | Cloudflare Tunnel | ⚠️ Real `cloudflared` wrapper, untestable in the build sandbox (no binary, no network route to Cloudflare) |
-| Windows/macOS adapters | ⚠️ Real code, unverified on real hosts |
+| Windows/macOS adapters | ✅ **Windows: live-verified by a contributor**, 6 real bugs found and fixed (all documented in commit history). ⚠️ macOS: real code, unverified on real hosts |
 | One-command installer | ✅ Live — run end-to-end against this published repo from a clean directory |
 
 ---
 
 ## 🗺️ Roadmap
 
+- [ ] PHP live verification (real code, needs a host where the package actually installs)
 - [ ] Backup to remote destinations (S3-compatible, SFTP, network share — currently local filesystem only)
 - [ ] Postgres live verification (real code, needs a host where the package actually installs)
 - [ ] Postgres trash/snapshot-based delete (currently always permanent)
-- [ ] Windows/macOS live verification
+- [ ] macOS live verification
 - [ ] Cloudflare Tunnel live verification
 - [ ] Node/Python site type live verification
 - [ ] Backups

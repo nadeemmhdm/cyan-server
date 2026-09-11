@@ -13,6 +13,16 @@ import urllib.request
 import json
 from pathlib import Path
 
+# Windows consoles default to the legacy cp1252 code page, which can't
+# encode characters like ✓ used throughout this CLI's output — caught via
+# real Windows testing (UnicodeEncodeError crashing `cyan setup`).
+# Reconfigure stdout/stderr to UTF-8 before anything else runs.
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import typer

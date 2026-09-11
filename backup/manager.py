@@ -25,12 +25,10 @@ from pathlib import Path
 
 from core.database import BackupConfig, get_session, DB_PATH
 
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-DEFAULT_BACKUP_DIR = DATA_DIR / "backups"
-CADDYFILE_PATH = DATA_DIR / "Caddyfile"
-SITES_DIR = DATA_DIR / "sites"
-DATABASES_DIR = DATA_DIR / "databases"
-STORAGE_DIR = DATA_DIR / "storage"
+def _data_dir() -> Path:
+    """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
+    _data_dir() docstring for why a cached path is a real bug."""
+    return Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
 
 
 class BackupError(Exception):
@@ -84,7 +82,7 @@ def _safe_sqlite_snapshot(dest_path: Path) -> None:
 
 def create_backup(destination: Path | None = None, include_storage: bool | None = None) -> Path:
     cfg = get_backup_config()
-    dest_dir = destination or (Path(cfg.destination_dir) if cfg.destination_dir else DEFAULT_BACKUP_DIR)
+    dest_dir = destination or (Path(cfg.destination_dir) if cfg.destination_dir else (_data_dir() / "backups"))
     dest_dir.mkdir(parents=True, exist_ok=True)
     if include_storage is None:
         include_storage = cfg.include_storage
@@ -98,14 +96,14 @@ def create_backup(destination: Path | None = None, include_storage: bool | None 
 
         with tarfile.open(archive_path, "w:gz") as tar:
             tar.add(tmp_db, arcname="cyan.db")
-            if CADDYFILE_PATH.exists():
-                tar.add(CADDYFILE_PATH, arcname="Caddyfile")
-            if SITES_DIR.exists():
-                tar.add(SITES_DIR, arcname="sites")
-            if DATABASES_DIR.exists():
-                tar.add(DATABASES_DIR, arcname="databases")
-            if include_storage and STORAGE_DIR.exists():
-                tar.add(STORAGE_DIR, arcname="storage")
+            if (_data_dir() / "Caddyfile").exists():
+                tar.add(_data_dir() / "Caddyfile", arcname="Caddyfile")
+            if (_data_dir() / "sites").exists():
+                tar.add(_data_dir() / "sites", arcname="sites")
+            if (_data_dir() / "databases").exists():
+                tar.add(_data_dir() / "databases", arcname="databases")
+            if include_storage and (_data_dir() / "storage").exists():
+                tar.add(_data_dir() / "storage", arcname="storage")
 
     set_backup_config(last_backup_at=datetime.utcnow(), last_backup_result="success")
     return archive_path
@@ -113,7 +111,7 @@ def create_backup(destination: Path | None = None, include_storage: bool | None 
 
 def list_backups(destination: Path | None = None) -> list[dict]:
     cfg = get_backup_config()
-    dest_dir = destination or (Path(cfg.destination_dir) if cfg.destination_dir else DEFAULT_BACKUP_DIR)
+    dest_dir = destination or (Path(cfg.destination_dir) if cfg.destination_dir else (_data_dir() / "backups"))
     if not dest_dir.exists():
         return []
     backups = []
@@ -156,7 +154,7 @@ def restore_backup(backup_path: Path, data_dir: Path | None = None) -> dict:
     if not backup_path.exists():
         raise BackupError(f"Backup file not found: {backup_path}")
 
-    target_dir = data_dir or DATA_DIR
+    target_dir = data_dir or _data_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(backup_path, "r:gz") as tar:

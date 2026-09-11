@@ -18,9 +18,14 @@ from pathlib import Path
 from core.database import TrashItem, get_session
 
 RETENTION_DAYS = 30
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-TRASH_DIR = DATA_DIR / "trash"
-TRASH_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def get_trash_dir() -> Path:
+    """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
+    _data_dir() docstring for why a cached path is a real bug."""
+    d = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "trash"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 class TrashError(Exception):
@@ -36,7 +41,7 @@ def move_to_trash(item_type: str, name: str, original_path: str,
         raise TrashError(f"Nothing to trash at {source_fs_path}")
 
     trash_id = str(uuid.uuid4())
-    trash_path = TRASH_DIR / trash_id
+    trash_path = get_trash_dir() / trash_id
     shutil.move(str(source_fs_path), str(trash_path))
 
     now = datetime.utcnow()

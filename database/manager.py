@@ -23,9 +23,12 @@ from pathlib import Path
 
 from core.database import ManagedDatabase, get_session
 
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-SQLITE_DIR = DATA_DIR / "databases"
-SQLITE_DIR.mkdir(parents=True, exist_ok=True)
+def _sqlite_dir() -> Path:
+    """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
+    _data_dir() docstring for why a cached path is a real bug."""
+    d = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "databases"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 class DatabaseError(Exception):
@@ -48,7 +51,7 @@ def create_database(name: str, engine: str = "sqlite") -> ManagedDatabase:
         session.close()
 
     if engine == "sqlite":
-        db_path = SQLITE_DIR / f"{name}.sqlite"
+        db_path = _sqlite_dir() / f"{name}.sqlite"
         if db_path.exists():
             raise DatabaseError(f"A SQLite file for '{name}' already exists at {db_path}")
         # Actually create it — SQLite creates the file lazily on first
@@ -231,7 +234,7 @@ def restore_database(trash_id: int) -> ManagedDatabase:
     if item.item_type != "database":
         raise DatabaseError(f"Trash item {trash_id} is not a database")
 
-    restore_to = SQLITE_DIR / f"{item.name}.sqlite"
+    restore_to = _sqlite_dir() / f"{item.name}.sqlite"
     try:
         trash_restore(trash_id, restore_to)
     except TrashError as e:

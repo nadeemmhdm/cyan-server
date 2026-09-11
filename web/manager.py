@@ -21,9 +21,20 @@ from core.database import Website, DeploymentEvent, get_session
 from platform_impl.base import get_platform_adapters
 from web.reverse_proxy import reload_caddy
 
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-SITES_DIR = DATA_DIR / "sites"
-SITES_DIR.mkdir(parents=True, exist_ok=True)
+def _data_dir() -> Path:
+    """Re-reads CYAN_DATA_DIR on every call rather than caching it at
+    import time. A stale cached path is a real bug: if CYAN_DATA_DIR
+    changes within a process (e.g. multiple test files sharing one pytest
+    process), a module that cached the old value keeps writing there —
+    caught during real Windows testing (tests/test_web_trash.py failing
+    because this module still had the directory from an earlier test)."""
+    return Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
+
+
+def get_sites_dir() -> Path:
+    d = _data_dir() / "sites"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 class SiteError(Exception):
@@ -31,7 +42,7 @@ class SiteError(Exception):
 
 
 def _site_dir(name: str) -> Path:
-    d = SITES_DIR / name
+    d = get_sites_dir() / name
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -77,9 +88,16 @@ def fetch_source(site: Website) -> Path:
         if not src.exists():
             raise SiteError(f"Source folder does not exist: {src}")
         if src.resolve() != target.resolve():
-            if target.exists():
-                shutil.rmtree(target)
-            shutil.copytree(src, target)
+            # Windows-safe: don't wipe the target directory outright —
+            # a running site process (especially one that opened its own
+            # log file inside this folder, like the static-site server)
+            # holds a file handle Windows won't let rmtree() past, even
+            # though the equivalent works fine on Linux/macOS. Caught via
+            # real Windows testing (WinError 32 on redeploy). The caller
+            # (deploy_site) now stops the site before calling this, and
+            # copytree's merge mode here means nothing needs deleting for
+            # a normal redeploy anyway.
+            shutil.copytree(src, target, dirs_exist_ok=True)
         return target
 
     if site.source_type == "git":
@@ -126,6 +144,28 @@ def _start_command(site: Website, path: Path) -> list[str] | None:
             raise SiteError("python site requires a main.py entrypoint")
         return [sys.executable, str(main)]
 
+    if site.site_type == "php":
+        if not shutil.which("php"):
+            raise SiteError("php is not installed on this host")
+        return ["php", "-S", f"0.0.0.0:{site.port}", "-t", str(path)]
+
+    if site.site_type == "react":
+        if not shutil.which("npm"):
+            raise SiteError("npm is not installed on this host (needed to build the React app)")
+        package_json = path / "package.json"
+        if not package_json.exists():
+            raise SiteError("react site requires a package.json with a build script")
+        subprocess.run(["npm", "install"], cwd=path, capture_output=True, text=True, timeout=300)
+        build = subprocess.run(["npm", "run", "build"], cwd=path,
+                                capture_output=True, text=True, timeout=300)
+        if build.returncode != 0:
+            raise SiteError(f"npm run build failed: {build.stderr[-2000:]}")
+        # Create React App / Vite output directories, in order of likelihood.
+        output_dir = next((path / d for d in ("build", "dist") if (path / d).is_dir()), None)
+        if not output_dir:
+            raise SiteError("build succeeded but no build/ or dist/ output directory was found")
+        return [sys.executable, "-m", "http.server", str(site.port), "--directory", str(output_dir)]
+
     return None
 
 
@@ -135,6 +175,21 @@ def deploy_site(name: str) -> Website:
         site = session.query(Website).filter_by(name=name).first()
         if not site:
             raise SiteError(f"Site '{name}' not found")
+
+        # Stop any process currently running for this site before
+        # touching its folder — on Windows, a live process holding a file
+        # handle inside the site directory (e.g. its own log file) blocks
+        # any operation that needs to modify that directory, even ones
+        # that no longer wipe it outright. Cheap and safe to call even
+        # when nothing is running (stop_site tolerates that).
+        if site.status == "running":
+            session.close()
+            try:
+                stop_site(name)
+            except SiteError:
+                pass
+            session = get_session()
+            site = session.query(Website).filter_by(name=name).first()
 
         try:
             path = fetch_source(site)
@@ -290,7 +345,7 @@ def restore_site(trash_id: int) -> Website:
         raise SiteError(f"Trash item {trash_id} is not a website")
     metadata = _json.loads(item.metadata_json or "{}")
 
-    restore_to = SITES_DIR / item.name  # NOT _site_dir() — that mkdirs, which
+    restore_to = get_sites_dir() / item.name  # NOT _site_dir() — that mkdirs, which
     # would leave an empty directory sitting exactly where restore needs to
     # move content back to, and restore refuses to overwrite anything present.
     try:
