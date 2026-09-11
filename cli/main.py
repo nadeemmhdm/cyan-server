@@ -238,9 +238,16 @@ def update(apply: bool = typer.Option(False, "--apply", help="Actually apply the
         console.print(f"[green]✓ Up to date[/green] (v{result['current_version']}, {result['local_commit'] or '?'})")
         return
 
-    console.print(f"[yellow]{result['commits_behind']} update(s) available:[/yellow]")
+    if result.get("is_security_update"):
+        console.print(f"[bold red]{result['commits_behind']} update(s) available — includes a SECURITY fix:[/bold red]")
+    else:
+        console.print(f"[yellow]{result['commits_behind']} update(s) available:[/yellow]")
     for line in result["changelog"]:
         console.print(f"  {line}")
+
+    if result.get("is_security_update"):
+        console.print("[red]Security updates apply automatically in the background "
+                       "regardless of your --auto setting.[/red]")
 
     if not apply:
         console.print("\nRun [bold]cyan update --apply[/bold] to install.")
@@ -408,6 +415,25 @@ def web_stop(name: str):
 def web_logs(name: str, lines: int = 50):
     result = _agent_get(f"/api/web/{name}/logs?lines={lines}", auth=True)
     console.print(result["logs"] or "(no logs yet)")
+
+
+@web_app.command("domain")
+def web_domain(name: str, domain: str = typer.Argument(None, help="Domain or subdomain, e.g. example.com or api.example.com. Omit to clear.")):
+    """Connect a domain or subdomain to a site — Caddy reloads live, no redeploy needed."""
+    result = _agent_post(f"/api/web/{name}/domain", {"domain": domain}, auth=True)
+    if domain:
+        console.print(f"[green]✓ {name} is now connected to {domain}[/green]")
+    else:
+        console.print(f"[yellow]Domain cleared for {name}[/yellow]")
+
+
+@web_app.command("delete")
+def web_delete(name: str, permanent: bool = typer.Option(False, "--permanent", help="Skip trash, delete immediately.")):
+    _agent_post(f"/api/web/{name}?permanent={'true' if permanent else 'false'}", auth=True, method="DELETE")
+    if permanent:
+        console.print(f"[yellow]Permanently deleted '{name}'[/yellow]")
+    else:
+        console.print(f"[green]✓ '{name}' moved to trash[/green] (restorable for 30 days — cyan trash list)")
 
 
 # --- Storage -------------------------------------------------------------

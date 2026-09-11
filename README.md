@@ -78,7 +78,9 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 ### Web hosting
 - Deploy static sites, Node.js, Python, or Docker-based sites from a folder, a git repo, or a Docker image
 - Real **Caddy**-backed reverse proxy — Caddyfile generated from your sites and hot-reloaded via Caddy's admin API, no manual config editing
+- **Domain and subdomain connection** — `cyan web domain <site> <hostname>` connects (or changes, or clears) a hostname live, no redeploy needed; subdomains work exactly the same way as root domains
 - Per-site logs, start/stop/redeploy
+- **Trash/recycle bin** — deleting a site moves it (source + domain + config) to a 30-day trash instead of destroying it; `cyan trash restore <id>` brings it back running, `--permanent` skips trash for good
 
 ### Storage server
 - Configurable storage root (works the same whether it's `D:\CyanStorage`, `/mnt/storage/cyan`, or `/Users/shared/CyanStorage`)
@@ -109,6 +111,7 @@ Security isn't bolted on — it's enforced at the framework level:
 | **Authorization** | Every mutating endpoint requires a valid JWT — tested live: unauthenticated requests get a real `401`, not a silent bypass |
 | **Path traversal** | Storage paths resolved and validated against the real root on every call, not string-matched |
 | **Package installs** | Shown to the user as a plan *before* execution — nothing installs silently, ever |
+| **Security patches** | Flagged commits (`[security]`/`CVE-`) auto-apply even with background auto-apply turned off — see [Auto-update](#-auto-update) |
 | **Response headers** | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` on every response |
 | **Privilege separation** | Never runs as root/admin by default; elevated operations go through platform-specific adapters, not raw shell strings |
 
@@ -129,6 +132,7 @@ cyan update --auto off      # background checks continue; auto-apply turned off 
 
 - A background thread checks your configured git remote on an interval (default: 60 min)
 - **Auto-*checking*** is on by default; **auto-*applying*** is off by default — you decide when updates land unless you explicitly opt in
+- **Exception: security fixes apply automatically regardless of the auto-apply setting.** A pending commit whose message contains `[security]` or a `CVE-` reference is treated as urgent and applied even if you've turned auto-apply off — `cyan update` also flags this clearly before it happens, so you're never surprised, but the patch doesn't wait on your preference the way a routine update does
 - Updates only ever apply via `git merge --ff-only` — never a force-push, never a history rewrite
 - Current status (last check time, result, config) is always available at `GET /api/update/config`
 
@@ -173,7 +177,7 @@ cyan up                 Recover any site/app that should be running but isn't
 cyan update             Check for / apply updates; --auto on|off for background mode
 cyan health             Raw agent health check
 
-cyan web list|create|deploy|stop|logs
+cyan web list|create|deploy|stop|logs|domain|delete
 cyan storage list|usage|mkdir|share|delete
 cyan trash list|restore|empty
 cyan apps list|install|start|stop
@@ -239,7 +243,8 @@ Everything in the table below was exercised against a **live agent process** —
 | App manager (requirement validation, pass + reject cases) | ✅ Live |
 | Auth (login, lockout, rate limit, audit log) | ✅ Live |
 | Recovery (`cyan up`, auto-recovery on startup) | ✅ Live — including the PID-reuse regression fix |
-| Trash / recycle bin (delete → restore, permanent delete, expiry purge) | ✅ Live — full round trip tested (delete, list, restore, content-integrity check, permanent delete, empty) |
+| Trash / recycle bin (delete → restore, permanent delete, expiry purge) | ✅ Live — storage AND websites now, full round trip tested for both (including a real domain/subdomain-preservation check on website restore) |
+| Domain/subdomain connection (`cyan web domain`) | ✅ Live — verified against the actual generated Caddyfile, tested with both a root domain and a subdomain |
 | Auto-update (check, config) | ✅ Live |
 | Cloudflare Tunnel | ⚠️ Real `cloudflared` wrapper, untestable in the build sandbox (no binary, no network route to Cloudflare) |
 | Windows/macOS adapters | ⚠️ Real code, unverified on real hosts |
@@ -249,7 +254,7 @@ Everything in the table below was exercised against a **live agent process** —
 
 ## 🗺️ Roadmap
 
-- [ ] Trash/recycle bin for websites and databases (currently storage only)
+- [ ] Trash/recycle bin for databases (storage and websites now covered)
 - [ ] Windows/macOS live verification
 - [ ] Cloudflare Tunnel live verification
 - [ ] Node/Python site type live verification

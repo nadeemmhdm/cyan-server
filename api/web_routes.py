@@ -68,3 +68,24 @@ def site_logs(name: str, lines: int = 100, _=Depends(require_auth)):
         return {"logs": web_manager.get_site_logs(name, lines)}
     except web_manager.SiteError as e:
         raise HTTPException(404, str(e))
+
+
+class SetDomainRequest(BaseModel):
+    domain: str | None = None  # None clears it
+
+
+@router.post("/{name}/domain")
+def set_domain(name: str, req: SetDomainRequest, _=Depends(require_auth)):
+    try:
+        return _serialize(web_manager.set_domain(name, req.domain))
+    except web_manager.SiteError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.delete("/{name}")
+def delete_site(name: str, permanent: bool = False, _=Depends(require_auth)):
+    try:
+        web_manager.delete_site(name, permanent=permanent)
+        return {"success": True, "permanent": permanent}
+    except web_manager.SiteError as e:
+        raise HTTPException(400, str(e))

@@ -37,6 +37,15 @@ class UpdateStatus:
     commits_behind: int
     changelog: list[str]
 
+    @property
+    def is_security_update(self) -> bool:
+        """True if any pending commit's message flags a security fix —
+        conventionally '[security]' or 'CVE-' in the subject line. Used
+        to bypass the auto_apply toggle: security fixes apply even when
+        the user has auto-apply turned off (see _auto_update_loop)."""
+        markers = ("[security]", "cve-")
+        return any(any(m in line.lower() for m in markers) for line in self.changelog)
+
 
 def _run_git(args: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(["git"] + args, cwd=REPO_ROOT,
@@ -156,8 +165,17 @@ def _auto_update_loop(stop_event: threading.Event):
         if cfg.auto_check:
             try:
                 status = check_for_update()
-                _record_check_result("up_to_date" if status.up_to_date else "update_available")
-                if status.commits_behind and cfg.auto_apply:
+                if status.is_security_update:
+                    _record_check_result("security_update_available")
+                else:
+                    _record_check_result("up_to_date" if status.up_to_date else "update_available")
+
+                # Security fixes apply regardless of the auto_apply toggle —
+                # a user who's turned auto-apply off still gets a vulnerable
+                # version patched automatically, since that risk outweighs
+                # the "I want to control when updates land" preference the
+                # toggle exists for. Non-security updates still respect it.
+                if status.commits_behind and (cfg.auto_apply or status.is_security_update):
                     apply_update()
             except Exception as e:  # noqa: BLE001 — background thread must never crash the agent
                 _record_check_result(f"error: {e}")

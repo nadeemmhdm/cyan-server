@@ -36,7 +36,7 @@ from api.apps_routes import router as apps_router
 from api.cloudflare_routes import router as cloudflare_router
 from api.trash_routes import router as trash_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.3.2")
+app = FastAPI(title="Cyan Server Agent", version="0.3.3")
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -124,6 +124,7 @@ def update_check():
         "remote_commit": status.remote_commit,
         "commits_behind": status.commits_behind,
         "changelog": status.changelog,
+        "is_security_update": status.is_security_update,
     }
 
 

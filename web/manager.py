@@ -209,6 +209,103 @@ def stop_site(name: str) -> Website:
         session.close()
 
 
+def set_domain(name: str, domain: str | None) -> Website:
+    """Connect (or change, or clear with domain=None) a domain/subdomain
+    for a site. Any hostname works here the same way — Caddy doesn't
+    distinguish 'domain' from 'subdomain', both are just a hostname
+    string in the generated Caddyfile — so 'api.example.com' works
+    exactly like 'example.com'. Triggers a live Caddy reload so it takes
+    effect immediately, no redeploy needed."""
+    session = get_session()
+    try:
+        site = session.query(Website).filter_by(name=name).first()
+        if not site:
+            raise SiteError(f"Site '{name}' not found")
+        site.domain = domain
+        session.commit()
+        _log_event(session, site.id, "set_domain", True, f"domain -> {domain}")
+        all_sites = session.query(Website).all()
+        session.refresh(site)
+        result = site
+    finally:
+        session.close()
+
+    reload_caddy(all_sites)
+    return result
+
+
+def delete_site(name: str, permanent: bool = False) -> None:
+    """Stops the site if running, then moves its source folder + config
+    to trash (30-day retention, same pattern as storage deletes) unless
+    permanent=True. The DB row itself is removed either way — trash
+    restore re-creates it from the saved metadata."""
+    session = get_session()
+    try:
+        site = session.query(Website).filter_by(name=name).first()
+        if not site:
+            raise SiteError(f"Site '{name}' not found")
+        site_snapshot = {
+            "site_type": site.site_type, "source_type": site.source_type,
+            "source": site.source, "port": site.port, "domain": site.domain,
+            "env_vars": site.env_vars,
+        }
+    finally:
+        session.close()
+
+    try:
+        stop_site(name)
+    except SiteError:
+        pass  # already stopped
+
+    site_dir = _site_dir(name)
+
+    session = get_session()
+    try:
+        site = session.query(Website).filter_by(name=name).first()
+        if site:
+            session.delete(site)
+            session.commit()
+    finally:
+        session.close()
+
+    if permanent:
+        import shutil as _shutil
+        if site_dir.exists():
+            _shutil.rmtree(site_dir)
+    elif site_dir.exists() and any(site_dir.iterdir()):
+        from trash.manager import move_to_trash
+        move_to_trash("website", name, name, site_dir, metadata=site_snapshot)
+    elif site_dir.exists():
+        site_dir.rmdir()  # empty dir, nothing worth trashing
+
+
+def restore_site(trash_id: int) -> Website:
+    """Re-creates a website's DB row from the trash item's saved
+    metadata and moves its folder back, then redeploys it."""
+    import json as _json
+    from trash.manager import restore as trash_restore, get_trash_item, TrashError
+
+    item = get_trash_item(trash_id)
+    if item.item_type != "website":
+        raise SiteError(f"Trash item {trash_id} is not a website")
+    metadata = _json.loads(item.metadata_json or "{}")
+
+    restore_to = SITES_DIR / item.name  # NOT _site_dir() — that mkdirs, which
+    # would leave an empty directory sitting exactly where restore needs to
+    # move content back to, and restore refuses to overwrite anything present.
+    try:
+        trash_restore(trash_id, restore_to)
+    except TrashError as e:
+        raise SiteError(str(e))
+
+    site = create_site(
+        name=item.name, site_type=metadata["site_type"], source_type=metadata["source_type"],
+        source=str(restore_to), port=metadata["port"], domain=metadata.get("domain"),
+        env_vars=_json.loads(metadata.get("env_vars") or "{}"),
+    )
+    return deploy_site(item.name)
+
+
 def list_sites() -> list[Website]:
     session = get_session()
     try:

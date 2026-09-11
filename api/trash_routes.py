@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from security.dependencies import require_auth
 from trash import manager as trash_manager
 from storage.manager import restore_from_trash as storage_restore, StorageError
+from web.manager import restore_site as web_restore_site, SiteError
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
 
@@ -29,8 +30,11 @@ def restore_item(trash_id: int, _=Depends(require_auth)):
         if item.item_type == "storage":
             restored_path = storage_restore(trash_id)
             return {"success": True, "restored_to": restored_path}
+        if item.item_type == "website":
+            site = web_restore_site(trash_id)
+            return {"success": True, "restored_to": site.name, "status": site.status}
         raise HTTPException(400, f"Restore not yet implemented for item_type '{item.item_type}'")
-    except (trash_manager.TrashError, StorageError) as e:
+    except (trash_manager.TrashError, StorageError, SiteError) as e:
         raise HTTPException(400, str(e))
 
 
