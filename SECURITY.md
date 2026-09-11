@@ -22,10 +22,10 @@ disclosure timeline.
 
 | Version | Supported |
 |---|---|
-| 0.3.x   | ✅ |
-| < 0.3   | ❌ (upgrade — `cyan update`) |
+| 0.5.x   | ✅ |
+| < 0.5   | ❌ (upgrade — `cyan update`) |
 
-## Current security posture (v0.3.0)
+## Current security posture (v0.5.1)
 
 - Passwords: bcrypt-hashed, never stored or logged in plaintext.
 - Sessions: JWT, 12-hour expiry, signed with a per-install secret generated
