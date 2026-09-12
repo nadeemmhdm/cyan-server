@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.6.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.6.1-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -78,6 +78,7 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 ### Web hosting
 - Deploy static sites, Node.js, Python, PHP, or React (build + serve), or Docker-based sites from a folder, a git repo, or a Docker image
 - Real **Caddy**-backed reverse proxy — Caddyfile generated from your sites and hot-reloaded via Caddy's admin API, no manual config editing
+- **Site file manager** — list, read, edit, upload, and delete files directly inside a deployed site's folder, without a full redeploy. Editing a static/React file takes effect on the next request — no restart needed
 - **Domain and subdomain connection** — `cyan web domain <site> <hostname>` connects (or changes, or clears) a hostname live, no redeploy needed; subdomains work exactly the same way as root domains
 - Per-site logs, start/stop/redeploy
 - **Trash/recycle bin** — deleting a site moves it (source + domain + config) to a 30-day trash instead of destroying it; `cyan trash restore <id>` brings it back running, `--permanent` skips trash for good
@@ -191,7 +192,7 @@ cyan up                 Recover any site/app that should be running but isn't
 cyan update             Check for / apply updates; --auto on|off for background mode
 cyan health             Raw agent health check
 
-cyan web list|create|deploy|stop|logs|domain|delete
+cyan web list|create|deploy|stop|logs|domain|delete|files|edit|rm-file
 cyan storage list|usage|mkdir|share|delete
 cyan trash list|restore|empty
 cyan backup create|list|restore|config
@@ -263,6 +264,7 @@ Everything in the table below was exercised against a **live agent process** —
 | Recovery (`cyan up`, auto-recovery on startup) | ✅ Live — including the PID-reuse regression fix |
 | Trash / recycle bin (delete → restore, permanent delete, expiry purge) | ✅ Live — storage AND websites now, full round trip tested for both (including a real domain/subdomain-preservation check on website restore) |
 | Domain/subdomain connection (`cyan web domain`) | ✅ Live — verified against the actual generated Caddyfile, tested with both a root domain and a subdomain |
+| Site file manager (`cyan web files/edit/rm-file`) | ✅ Live — edited a live static site's file through the CLI and confirmed the running server immediately served the new content with zero redeploy; cross-site path-traversal isolation verified |
 | Database manager (SQLite: create, query, status, delete/restore) | ✅ Live — full round trip including a real CREATE TABLE + INSERT + data-integrity check across delete/restore |
 | Database manager (Postgres) | ⚠️ Real code against the real `psql`/`createdb`/`dropdb` surface, unverified — the build sandbox's package mirror returned 404s for every Postgres package at build time |
 | Backup & restore | ✅ Live — full disaster-recovery test: real site + real database created, explicit backup taken, **actual `cyan backup restore` run** (stops agent, extracts, restarts), site auto-redeployed and serving again, database row data intact, pre-restore state genuinely preserved on disk (not deleted). A stale-connection-pool bug was caught and fixed during this: `attempt to write a readonly database` after a second restore in the same process, fixed by disposing the SQLAlchemy engine's pool as part of restore |

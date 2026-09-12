@@ -430,3 +430,61 @@ def get_site_logs(name: str, lines: int = 100) -> str:
     if not log_path.exists():
         return ""
     return "\n".join(log_path.read_text().splitlines()[-lines:])
+
+
+# ---------------------------------------------------------------------------
+# Site file manager — edit a deployed site's files directly (spec-adjacent:
+# lets you fix a typo or swap an asset without a full git-push redeploy).
+# Same path-traversal-safe pattern as storage/manager.py, scoped to one
+# site's folder instead of the shared storage root.
+# ---------------------------------------------------------------------------
+
+def _site_safe_path(name: str, relative: str) -> Path:
+    root = _site_dir(name).resolve()
+    candidate = (root / relative.lstrip("/")).resolve()
+    if root not in candidate.parents and candidate != root:
+        raise SiteError("Path traversal rejected")
+    return candidate
+
+
+def list_site_files(name: str, relative: str = "") -> list[dict]:
+    target = _site_safe_path(name, relative)
+    if not target.exists():
+        raise SiteError("Path does not exist")
+    if not target.is_dir():
+        raise SiteError("Path is not a directory")
+    entries = []
+    for item in sorted(target.iterdir()):
+        stat = item.stat()
+        entries.append({
+            "name": item.name, "is_dir": item.is_dir(),
+            "size_bytes": stat.st_size if item.is_file() else None,
+        })
+    return entries
+
+
+def read_site_file(name: str, relative: str) -> bytes:
+    target = _site_safe_path(name, relative)
+    if not target.is_file():
+        raise SiteError("Not a file")
+    return target.read_bytes()
+
+
+def write_site_file(name: str, relative: str, content: bytes) -> None:
+    """Overwrites (or creates) a file within the site's folder. Live
+    sites pick up static-file changes on next request — no redeploy
+    needed for static/react (already-built) content; node/python/php
+    apps that read files at startup would need a redeploy to see it."""
+    target = _site_safe_path(name, relative)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+
+
+def delete_site_file(name: str, relative: str) -> None:
+    target = _site_safe_path(name, relative)
+    if not target.exists():
+        raise SiteError("Path does not exist")
+    if target.is_dir():
+        shutil.rmtree(target)
+    else:
+        target.unlink()

@@ -40,7 +40,7 @@ from api.backup_routes import router as backup_router
 from api.ngrok_routes import router as ngrok_router
 from api.tunnel_connect_routes import router as tunnel_connect_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.6.0")
+app = FastAPI(title="Cyan Server Agent", version="0.6.1")
 
 app.add_middleware(SecurityHeadersMiddleware)
 

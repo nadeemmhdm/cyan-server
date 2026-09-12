@@ -34,3 +34,5 @@ jobs:
         run: python3 tests/test_site_types.py
       - name: Run tunnel-connect tests
         run: python3 tests/test_tunnel_connect.py
+      - name: Run site-file-manager tests
+        run: python3 tests/test_site_files.py

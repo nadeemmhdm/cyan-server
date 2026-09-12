@@ -446,6 +446,45 @@ def web_delete(name: str, permanent: bool = typer.Option(False, "--permanent", h
         console.print(f"[green]✓ '{name}' moved to trash[/green] (restorable for 30 days — cyan trash list)")
 
 
+@web_app.command("files")
+def web_files(name: str, path: str = typer.Argument("")):
+    """List files inside a deployed site's folder."""
+    result = _agent_get(f"/api/web/{name}/files?path={path}", auth=True)
+    table = Table(title=f"{name}:/{path}")
+    table.add_column("Name")
+    table.add_column("Type")
+    table.add_column("Size")
+    for e in result["entries"]:
+        table.add_row(e["name"], "dir" if e["is_dir"] else "file",
+                       "-" if e["size_bytes"] is None else f"{e['size_bytes']} B")
+    console.print(table)
+
+
+@web_app.command("edit")
+def web_edit(name: str, path: str, content: str = typer.Option(None, help="New text content. Omit to just print the current content.")):
+    """Read or write a text file within a site's folder directly — fix a
+    typo without a full redeploy."""
+    if content is None:
+        headers = _auth_headers()
+        req = urllib.request.Request(f"{AGENT_BASE}/api/web/{name}/files/download?path={path}", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                console.print(resp.read().decode("utf-8", errors="replace"))
+        except urllib.error.HTTPError as e:
+            body = json.loads(e.read())
+            console.print(f"[red]✗ {body.get('detail', str(e))}[/red]")
+            raise typer.Exit(code=1)
+        return
+    _agent_post(f"/api/web/{name}/files/write", {"path": path, "content": content}, auth=True)
+    console.print(f"[green]✓ Wrote {path}[/green]")
+
+
+@web_app.command("rm-file")
+def web_rm_file(name: str, path: str):
+    _agent_post(f"/api/web/{name}/files?path={path}", auth=True, method="DELETE")
+    console.print(f"[yellow]Deleted {path} from '{name}'[/yellow]")
+
+
 # --- Storage -------------------------------------------------------------
 
 storage_app = typer.Typer(help="Manage the storage server.")
