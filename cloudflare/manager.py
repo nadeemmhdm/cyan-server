@@ -51,7 +51,7 @@ def create_tunnel(name: str) -> TunnelConfig:
 
     session = get_session()
     try:
-        cfg = TunnelConfig(tunnel_name=name, tunnel_id=tunnel_id, status="disabled")
+        cfg = TunnelConfig(provider="cloudflare", tunnel_name=name, tunnel_id=tunnel_id, status="disabled")
         session.add(cfg)
         session.commit()
         session.refresh(cfg)
@@ -108,7 +108,7 @@ def start_tunnel(tunnel_name: str) -> subprocess.Popen:
 def status() -> list[dict]:
     session = get_session()
     try:
-        tunnels = session.query(TunnelConfig).all()
+        tunnels = session.query(TunnelConfig).filter_by(provider="cloudflare").all()
         out = []
         for t in tunnels:
             hostnames = session.query(TunnelHostname).filter_by(tunnel_config_id=t.id).all()

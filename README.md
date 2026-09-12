@@ -2,13 +2,13 @@
 
 **Turn any Windows, Linux, or macOS machine into a self-hosted personal server — with one command.**
 
-Cyan Server is a cross-platform server-builder and management platform. It is **not an operating system** — it installs on top of whatever OS your device already runs, detects your hardware, and gives you web hosting, file storage, an application manager, and optional Cloudflare Tunnel access through one agent, one CLI, and one dashboard.
+Cyan Server is a cross-platform server-builder and management platform. It is **not an operating system** — it installs on top of whatever OS your device already runs, detects your hardware, and gives you web hosting, file storage, SQL databases, an application manager, and worldwide access via Cloudflare Tunnel or ngrok, through one agent, one CLI, and one dashboard.
 
 [![CI](https://github.com/nadeemmhdm/cyan-server/actions/workflows/ci.yml/badge.svg)](https://github.com/nadeemmhdm/cyan-server/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.5.1-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.6.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -104,9 +104,11 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 - Install apps from a YAML manifest (Docker or Docker Compose)
 - **Requirements are validated against your host's real, live resources** before anything installs — an app asking for more RAM than you have, or requiring Docker when it isn't installed, is rejected with the actual numbers
 
-### Cloudflare Tunnel (optional)
-- Wraps the real `cloudflared` CLI — create a tunnel, route a hostname to a local service, all from `cyan tunnel`
-- Fully optional — nothing else in Cyan Server depends on it; LAN/local hosting works with zero internet exposure
+### Worldwide access via tunnels
+- **Two tunnel providers**: Cloudflare Tunnel (custom domains, needs a Cloudflare account) and ngrok (instant public URL, no domain needed) — `cyan tunnel status` shows what's installed
+- **`cyan tunnel connect <site> ...`** — the actual "local site, worldwide access" step in one command: looks up your deployed site's real local port automatically, so you never construct a `local_service` URL by hand
+- Once a site has a connected domain (`cyan web domain`) *and* a tunnel route to that same hostname, it's reachable from any device, anywhere, with no port-forwarding and no public IP
+- Fully optional — nothing else in Cyan Server depends on either provider; LAN/local hosting works with zero internet exposure
 
 ---
 
@@ -169,7 +171,7 @@ Under the hood this checks *real* liveness — whether something is actually lis
 The dashboard is a single responsive page — no app to install, works in any mobile browser.
 
 - **On your LAN**: open `http://<device-ip>:7331` from your phone or laptop and log in with your Cyan Server username and password (same account `cyan login` uses). Find your device's IP with `cyan setup` (it's in the Network section of the output).
-- **From outside your LAN**: put the agent behind a **Cloudflare Tunnel** (`cyan tunnel create`, `cyan tunnel status`) and hit your chosen hostname — no port forwarding, no exposed IP.
+- **From outside your LAN**: put a site behind a **Cloudflare Tunnel or ngrok** (`cyan tunnel connect <site> --hostname ... --provider cloudflare|ngrok`) and hit your chosen hostname or the generated URL — no port forwarding, no exposed IP.
 - **Login is the same everywhere** — one admin account, one password, whether you're on the CLI, the desktop dashboard, or a phone browser. Sessions are JWT-based and expire after 12 hours.
 - Don't expose port 7331 directly to the public internet without a tunnel or your own TLS in front of it — see [Security](#-security) for why.
 
@@ -195,7 +197,7 @@ cyan trash list|restore|empty
 cyan backup create|list|restore|config
 cyan db list|create|status|query|delete
 cyan apps list|install|start|stop
-cyan tunnel status|create
+cyan tunnel status|create|connect|url
 ```
 
 Custom admin credentials at first run (instead of the auto-generated password):
@@ -266,6 +268,8 @@ Everything in the table below was exercised against a **live agent process** —
 | Backup & restore | ✅ Live — full disaster-recovery test: real site + real database created, explicit backup taken, **actual `cyan backup restore` run** (stops agent, extracts, restarts), site auto-redeployed and serving again, database row data intact, pre-restore state genuinely preserved on disk (not deleted). A stale-connection-pool bug was caught and fixed during this: `attempt to write a readonly database` after a second restore in the same process, fixed by disposing the SQLAlchemy engine's pool as part of restore |
 | Auto-update (check, config) | ✅ Live |
 | Cloudflare Tunnel | ⚠️ Real `cloudflared` wrapper, untestable in the build sandbox (no binary, no network route to Cloudflare) |
+| ngrok Tunnel | ⚠️ Real code against ngrok's CLI/local API, untestable in this sandbox — the npm-based installer's binary download isn't reachable |
+| Tunnel↔site connection (`cyan tunnel connect`) | ✅ Live — real site-port lookup against a deployed site, correct error ordering (missing site caught before provider check), honest provider-unavailable errors for both providers |
 | Windows/macOS adapters | ✅ **Windows: live-verified by a contributor**, 6 real bugs found and fixed (all documented in commit history). ⚠️ macOS: real code, unverified on real hosts |
 | One-command installer | ✅ Live — run end-to-end against this published repo from a clean directory |
 
@@ -279,6 +283,7 @@ Everything in the table below was exercised against a **live agent process** —
 - [ ] Postgres trash/snapshot-based delete (currently always permanent)
 - [ ] macOS live verification
 - [ ] Cloudflare Tunnel live verification
+- [ ] ngrok live verification
 - [ ] Node/Python site type live verification
 - [ ] Backups
 - [ ] Resource-profile enforcement (Low/Balanced/Performance limits on what can be installed, beyond today's per-app RAM/storage checks)

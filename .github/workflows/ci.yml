@@ -32,3 +32,5 @@ jobs:
         run: python3 tests/test_backup.py
       - name: Run site-type tests
         run: python3 tests/test_site_types.py
+      - name: Run tunnel-connect tests
+        run: python3 tests/test_tunnel_connect.py

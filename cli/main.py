@@ -736,25 +736,80 @@ def apps_stop(name: str):
 
 # --- Cloudflare Tunnel -------------------------------------------------------------
 
-tunnel_app = typer.Typer(help="Manage Cloudflare Tunnel (optional, requires cloudflared).")
+tunnel_app = typer.Typer(help="Manage tunnels (Cloudflare or ngrok) for worldwide access to local sites.")
 app.add_typer(tunnel_app, name="tunnel")
 
 
 @tunnel_app.command("status")
 def tunnel_status():
-    avail = _agent_get("/api/cloudflare/available")
-    if not avail["cloudflared_available"]:
-        console.print("[yellow]cloudflared is not installed on this host.[/yellow] "
-                       "Cloudflare Tunnel is fully optional — LAN/web hosting works without it.")
-        return
-    result = _agent_get("/api/cloudflare/status", auth=True)
-    console.print(result["tunnels"] or "No tunnels configured.")
+    """Shows status for both providers — whichever is installed."""
+    cf_avail = _agent_get("/api/cloudflare/available")
+    ngrok_avail = _agent_get("/api/ngrok/available")
+
+    if cf_avail["cloudflared_available"]:
+        result = _agent_get("/api/cloudflare/status", auth=True)
+        console.print("[bold]Cloudflare:[/bold]", result["tunnels"] or "No tunnels configured.")
+    else:
+        console.print("[yellow]cloudflared not installed.[/yellow]")
+
+    if ngrok_avail["ngrok_available"]:
+        result = _agent_get("/api/ngrok/status", auth=True)
+        console.print("[bold]ngrok:[/bold]", result["tunnels"] or "No tunnels configured.")
+    else:
+        console.print("[yellow]ngrok not installed.[/yellow]")
+
+    if not cf_avail["cloudflared_available"] and not ngrok_avail["ngrok_available"]:
+        console.print("\nTunnels are fully optional — LAN/web hosting works without either.")
 
 
 @tunnel_app.command("create")
-def tunnel_create(name: str):
-    result = _agent_post("/api/cloudflare/tunnel", {"name": name}, auth=True)
-    console.print(f"[green]✓ Tunnel '{result['name']}' created[/green]")
+def tunnel_create(name: str, provider: str = typer.Option("cloudflare", help="cloudflare or ngrok")):
+    if provider == "cloudflare":
+        result = _agent_post("/api/cloudflare/tunnel", {"name": name}, auth=True)
+        console.print(f"[green]✓ Cloudflare tunnel '{result['name']}' created[/green]")
+    else:
+        console.print("[yellow]ngrok tunnels are created on demand with 'cyan tunnel connect' — "
+                       "there's no separate create step.[/yellow]")
+
+
+@tunnel_app.command("connect")
+def tunnel_connect(
+    site: str,
+    hostname: str = typer.Option(None, help="Domain/subdomain to route to this site. Required for Cloudflare; optional for ngrok (random URL if omitted)."),
+    provider: str = typer.Option("cloudflare", help="cloudflare or ngrok"),
+    tunnel_name: str = typer.Option(None, help="Cloudflare only: the tunnel to route through (from 'cyan tunnel create')."),
+):
+    """Connect a deployed site directly to a public tunnel — looks up the
+    site's real local port automatically, so you never construct a
+    local_service URL by hand. This is the actual 'local site, worldwide
+    access' step: once a site has both a connected domain (cyan web
+    domain) and a tunnel route to that same hostname, it's reachable from
+    any device without port-forwarding or a public IP."""
+    if provider == "cloudflare":
+        if not hostname or not tunnel_name:
+            console.print("[red]✗ Cloudflare requires both --hostname and --tunnel-name "
+                           "(create one first with: cyan tunnel create <name>)[/red]")
+            raise typer.Exit(code=1)
+        result = _agent_post("/api/tunnel-connect/cloudflare",
+                              {"site_name": site, "hostname": hostname, "tunnel_name": tunnel_name}, auth=True)
+        console.print(f"[green]✓ {site} connected to https://{result['hostname']}[/green]")
+    elif provider == "ngrok":
+        result = _agent_post("/api/tunnel-connect/ngrok", {"site_name": site, "hostname": hostname}, auth=True)
+        console.print(f"[green]✓ ngrok tunnel started for '{site}' (port {result['port']})[/green]")
+        console.print("  Run 'cyan tunnel url' to get the public URL once it's up.")
+    else:
+        console.print(f"[red]✗ Unknown provider: {provider}[/red]")
+        raise typer.Exit(code=1)
+
+
+@tunnel_app.command("url")
+def tunnel_url(port: int = typer.Option(None, help="Filter to a specific local port.")):
+    """Get the current public ngrok URL for an active tunnel."""
+    result = _agent_get(f"/api/ngrok/public-url" + (f"?port={port}" if port else ""), auth=True)
+    if result["public_url"]:
+        console.print(f"[green]{result['public_url']}[/green]")
+    else:
+        console.print("[yellow]No active ngrok tunnel found.[/yellow]")
 
 
 if __name__ == "__main__":

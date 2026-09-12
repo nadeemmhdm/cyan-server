@@ -116,6 +116,7 @@ class Application(Base):
 class TunnelConfig(Base):
     __tablename__ = "tunnel_config"
     id = Column(Integer, primary_key=True)
+    provider = Column(String, default="cloudflare")   # cloudflare | ngrok
     tunnel_name = Column(String, nullable=False)
     tunnel_id = Column(String, nullable=True)
     status = Column(String, default="disabled")  # disabled | enabled | error

@@ -1,8 +1,8 @@
 # Security Policy
 
-Cyan Server manages web hosting, file storage, and application deployment
-on a real host — security issues here can mean real compromise. Please
-report responsibly.
+Cyan Server manages web hosting, file storage, SQL databases, and
+application deployment on a real host — security issues here can mean
+real compromise. Please report responsibly.
 
 ## Reporting a Vulnerability
 
@@ -22,10 +22,10 @@ disclosure timeline.
 
 | Version | Supported |
 |---|---|
-| 0.3.x   | ✅ |
-| < 0.3   | ❌ (upgrade — `cyan update`) |
+| 0.5.x   | ✅ |
+| < 0.5   | ❌ (upgrade — `cyan update`) |
 
-## Current security posture (v0.3.0)
+## Current security posture (v0.5.1)
 
 - Passwords: bcrypt-hashed, never stored or logged in plaintext.
 - Sessions: JWT, 12-hour expiry, signed with a per-install secret generated
@@ -34,13 +34,22 @@ disclosure timeline.
   per-username lockout (5 failed attempts → 5-minute lockout), both logged
   to an audit trail (`/api/auth/audit-log`, admin-only).
 - Every mutating API endpoint requires a valid JWT; unauthenticated
-  requests get a real `401`.
+  requests get a real `401`. Admin-only operations (audit log, database
+  query execution, backup creation/config) require the `admin` role
+  specifically, not just any authenticated session.
 - Storage: path-traversal protected at the filesystem-resolution layer,
   not by string matching.
+- Backup restore: archive extraction validates every member against
+  path-traversal/tarbomb patterns before anything touches disk, and is
+  deliberately CLI-only (no API endpoint) since it requires stopping the
+  agent first.
 - Package installs: shown to the user as a plan *before* execution —
   nothing installs silently.
 - Response headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options:
   DENY`, `Referrer-Policy: no-referrer` on every response.
+- Security-flagged updates (commit messages containing `[security]` or a
+  `CVE-` reference) auto-apply even when background auto-apply is
+  otherwise turned off — see the README's Auto-update section.
 
 ## Known limitations (be aware of these before exposing to the internet)
 
@@ -53,3 +62,10 @@ disclosure timeline.
   `origin` — it will not run arbitrary code from a non-fast-forward
   history, but you're trusting whatever is in the git remote you've
   configured. Only point `CYAN_REPO_URL` at a remote you trust.
+- Postgres database drops (via the Database Manager) are always
+  permanent — there's no trash/snapshot step for a live SQL database yet
+  (SQLite databases do go through the same 30-day trash as storage/sites).
+- Windows has been live-verified by a contributor as of v0.5.1 (6 real
+  bugs found and fixed — see the changelog). macOS has not yet had an
+  equivalent real-hardware pass; treat the macOS platform adapter as
+  unverified until it does.
