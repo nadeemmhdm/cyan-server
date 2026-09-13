@@ -81,9 +81,12 @@ def get_default_tunnel_name() -> str:
 
 
 def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str | None = None) -> dict:
-    from cloudflare.manager import add_hostname, TunnelError
+    from cloudflare.manager import add_hostname, TunnelError, cloudflared_available
     from tunnel.state import record_tunnel_route, restart_cloudflared_tunnel
     import web.manager as web_manager
+
+    if not cloudflared_available():
+        raise TunnelConnectError("cloudflared is not installed on this host")
 
     default_name = get_default_tunnel_name()
     if not tunnel_name or (tunnel_name.endswith("-tunnel") and tunnel_name != default_name and default_name == "cyan-tunnel"):
@@ -103,7 +106,9 @@ def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str |
     # Add hostname route to cloudflared
     try:
         add_hostname(tunnel_name, clean_host, f"http://127.0.0.1:{port}")
-    except TunnelError:
+    except TunnelError as e:
+        if "not installed" in str(e).lower() or "not found" in str(e).lower():
+            raise TunnelConnectError(str(e))
         pass
 
     # Auto-generate / sync tunnel_config.yml ingress rules

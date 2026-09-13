@@ -60,8 +60,14 @@ def test_react_build_and_serve_pipeline():
 
     import time
     import urllib.request
-    time.sleep(1)
-    body = urllib.request.urlopen(f"http://localhost:{port}/index.html", timeout=5).read().decode()
+    body = None
+    for _ in range(10):
+        try:
+            body = urllib.request.urlopen(f"http://127.0.0.1:{port}/index.html", timeout=2).read().decode()
+            break
+        except Exception:
+            time.sleep(0.5)
+    assert body is not None
     assert "react test" in body
 
     web_manager.stop_site("reacttest")
