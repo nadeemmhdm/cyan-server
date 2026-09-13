@@ -153,8 +153,10 @@ def _start_command(site: Website, path: Path) -> list[str] | None:
             raise SiteError("node is not installed on this host")
         package_json = path / "package.json"
         if package_json.exists():
-            subprocess.run(["npm", "install", "--omit=dev"], cwd=path,
-                            capture_output=True, text=True, timeout=300)
+            npm_bin = shutil.which("npm") or "npm"
+            subprocess.run([npm_bin, "install", "--omit=dev"], cwd=path,
+                            capture_output=True, text=True, timeout=300,
+                            shell=(sys.platform == "win32"))
         return ["node", "server.js"]
 
     if site.site_type == "python":
@@ -174,14 +176,16 @@ def _start_command(site: Website, path: Path) -> list[str] | None:
         return ["php", "-S", f"0.0.0.0:{site.port}", "-t", str(path)]
 
     if site.site_type == "react":
-        if not shutil.which("npm"):
+        npm_bin = shutil.which("npm")
+        if not npm_bin:
             raise SiteError("npm is not installed on this host (needed to build the React app)")
         package_json = path / "package.json"
         if not package_json.exists():
             raise SiteError("react site requires a package.json with a build script")
-        subprocess.run(["npm", "install"], cwd=path, capture_output=True, text=True, timeout=300)
-        build = subprocess.run(["npm", "run", "build"], cwd=path,
-                                capture_output=True, text=True, timeout=300)
+        is_win = (sys.platform == "win32")
+        subprocess.run([npm_bin, "install"], cwd=path, capture_output=True, text=True, timeout=300, shell=is_win)
+        build = subprocess.run([npm_bin, "run", "build"], cwd=path,
+                                capture_output=True, text=True, timeout=300, shell=is_win)
         if build.returncode != 0:
             raise SiteError(f"npm run build failed: {build.stderr[-2000:]}")
         # Create React App / Vite output directories, in order of likelihood.

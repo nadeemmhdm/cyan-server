@@ -1,3 +1,56 @@
+# Cyan Server v0.7.1 Release Notes
+
+**Cyan Server v0.7.1** introduces an interactive numbered CLI menu system, single-command reboot auto-resume (`cyan resume`), startup update checks with self-restart, automated modern default web page generation for newly hosted websites, and critical cross-platform Windows bug fixes.
+
+---
+
+## 🌟 Major Highlights & New Features
+
+### 1. Interactive Numbered Menu CLI (`cyan` / `python cli/main.py`)
+Launching `cyan` without arguments now presents a cyber-styled terminal interface with numbered navigation:
+- **`[01] Host Website`**:
+  - `[1] Create Website`: Prompts for website name and folder path. Automatically detects or provisions the folder, auto-generates a modern responsive `index.html` starter page (with dark mode, Outfit/Inter typography, and Boxicons), auto-allocates an open local port (8080+), registers the site, and offers instant deployment.
+  - `[2] View Available Hosted Sites`: Interactive table displaying all sites, types, ports, local URLs, custom domains, and live running statuses.
+  - `[3] Manage Site`: Choose a site to start, stop, connect Caddy live SSL domains, connect Cloudflare/ngrok tunnels, view live logs, or delete.
+- **`[02] Database`**:
+  - `[1] List Databases`: View all provisioned databases with Unique IDs (`name_4to6digits`).
+  - `[2] Create Database`: Interactive database creation with SQLite/PostgreSQL engine support.
+  - `[3] Run SQL Query`: Interactive SQL runner with real-time tabular output.
+  - `[4] Database Info`: Inspect tables, schema, and byte sizes.
+  - `[5] Delete Database`: Clean removal with trash protection or permanent delete.
+- **`[03] Storage Bucket`**:
+  - `[1] List Storage Buckets`: View Unique IDs, file counts, and storage sizes.
+  - `[2] Create Storage Bucket`: Provision a bucket with a Unique ID and optional description.
+  - `[3] View Files in Bucket`: Browse uploaded files, sizes, and MIME types.
+  - `[4] Upload File to Bucket`: Upload local files directly into the bucket.
+  - `[5] Delete Storage Bucket`: Remove a bucket.
+- **`[04] Auto-Resume (Reboot Survival)`**:
+  - Instantly restores the complete Cyan Server stack with one click or command.
+- **`[00] Exit`**:
+  - Clean exit from the interactive menu.
+
+### 2. Universal Auto-Resume (`cyan resume` / Menu Option `04`)
+Designed specifically for when laptops or servers are powered off or restarted:
+- **Single Command Restoration**: Run `cyan resume` (or select `[04]` from the menu) at any time after booting your laptop.
+- **Self-Healing Stack**:
+  1. Checks if the background Agent daemon is running; automatically spawns it if offline.
+  2. Recovers all previously running websites and background applications.
+  3. Reloads the Caddy reverse proxy to reconnect all custom domains with valid SSL.
+  4. Restores Cloudflare tunnels (`cloudflared`) and ngrok tunnels according to saved persistent route state (`tunnel_state.json`).
+  5. Displays a status table verifying that every service, domain, and tunnel is online.
+
+### 3. Startup Auto-Update Checks
+- On every CLI startup, Cyan Server checks the remote git repository for new commits.
+- If updates are detected, changelogs are displayed, and the tool can automatically apply the update (`git pull`) and restart the CLI in place.
+
+### 4. Cross-Platform Windows & Security Fixes
+- **Windows Command Execution**: Fixed `npm` execution in React/Node site deployment by resolving `npm.cmd` via `shutil.which()` with `shell=True` on Windows.
+- **Windows CP1252 UTF-8 Safety**: Configured automatic UTF-8 stream re-encoding so box-drawing, checkmarks (`✓`), and Rich visual styling do not crash Windows terminals.
+- **Background Process Detachment**: Ensured background services use `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS` on Windows so child servers survive terminal closure.
+- **Local CLI Authentication**: Seamlessly authenticates local CLI sessions without manual login prompts while maintaining strict JWT verification for external API requests.
+
+---
+
 # Cyan Server v0.7.0 Release Notes
 
 **Cyan Server v0.7.0** introduces a modern Web Dashboard with a glassmorphism authentication gate, unified Unique ID architecture for Databases and Storage Buckets, universal developer API keys, an expanded interactive CLI, and comprehensive security hardening.

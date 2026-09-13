@@ -49,7 +49,7 @@ def test_react_build_and_serve_pipeline():
     src = Path(tempfile.mkdtemp())
     (src / "package.json").write_text(
         '{"name": "t", "version": "1.0.0", '
-        '"scripts": {"build": "mkdir -p dist && cp index.html dist/index.html"}}'
+        '"scripts": {"build": "node -e \\"const fs=require(\'fs\'); fs.mkdirSync(\'dist\', {recursive:true}); fs.copyFileSync(\'index.html\', \'dist/index.html\');\\""}}'
     )
     (src / "index.html").write_text("<h1>react test</h1>")
 

@@ -30,9 +30,11 @@ def get_site_port(site_name: str) -> int:
 
 def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str) -> dict:
     from cloudflare.manager import add_hostname, TunnelError
+    from tunnel.state import record_tunnel_route
     port = get_site_port(site_name)
     try:
         route = add_hostname(tunnel_name, hostname, f"http://localhost:{port}")
+        record_tunnel_route(tunnel_name=tunnel_name, provider="cloudflare", site_name=site_name, hostname=hostname, port=port)
     except TunnelError as e:
         raise TunnelConnectError(str(e))
     return {"site": site_name, "hostname": route.hostname, "local_service": route.local_service}
@@ -40,9 +42,11 @@ def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str) 
 
 def connect_site_to_ngrok(site_name: str, hostname: str | None = None) -> dict:
     from ngrok.manager import start_tunnel, NgrokError
+    from tunnel.state import record_tunnel_route
     port = get_site_port(site_name)
     try:
         cfg = start_tunnel(f"site-{site_name}", port, hostname)
+        record_tunnel_route(tunnel_name=f"site-{site_name}", provider="ngrok", site_name=site_name, hostname=hostname or "ngrok-dynamic", port=port)
     except NgrokError as e:
         raise TunnelConnectError(str(e))
     return {"site": site_name, "port": port, "tunnel_name": cfg.tunnel_name}

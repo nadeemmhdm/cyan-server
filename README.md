@@ -58,10 +58,22 @@ python3 agent/main.py     # ONE command — API + dashboard both come up on :733
 Then from the CLI:
 
 ```bash
-cyan login --password "<printed on first agent start>"   # username is always admin
-cyan setup                    # real hardware/OS/network detection
+cyan                            # Launches the interactive cyber numbered menu:
+                                #   [01] Host Website
+                                #   [02] Database
+                                #   [03] Storage Bucket
+                                #   [04] Auto-Resume (Reboot Survival)
+                                #   [00] Exit
+
+cyan resume                     # Single-command reboot survival: restores agent daemon,
+                                # all hosted websites, Caddy SSL domains, and public tunnels!
+```
+
+Or use direct subcommands:
+```bash
+cyan setup                      # real hardware/OS/network detection
 cyan web create mysite static folder ./my-site 8080
-cyan web deploy mysite        # live behind Caddy in seconds
+cyan web deploy mysite          # live behind Caddy in seconds
 ```
 
 Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere on your LAN — see [Remote & mobile access](#-remote--mobile-access)).

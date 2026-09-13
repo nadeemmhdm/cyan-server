@@ -71,8 +71,37 @@ def _save_token(token: str) -> None:
         pass
 
 
+@app.callback(invoke_without_command=True)
+def main_callback(ctx: typer.Context):
+    """Cyan Server CLI. Run without arguments to launch the interactive menu."""
+    if ctx.invoked_subcommand is None:
+        from cli.interactive import interactive_menu
+        interactive_menu()
+
+
+def _auto_token() -> str | None:
+    """Auto-mint and cache an admin JWT token if running locally as the system user."""
+    try:
+        from security.auth import create_token
+        from core.database import User, get_session
+        session = get_session()
+        try:
+            admin = session.query(User).filter_by(role="admin").first()
+            if admin:
+                token = create_token(admin)
+                _save_token(token)
+                return token
+        finally:
+            session.close()
+    except Exception:
+        pass
+    return None
+
+
 def _auth_headers() -> dict:
     token = _load_token()
+    if not token:
+        token = _auto_token()
     if not token:
         console.print("[red]✗ Not logged in.[/red] Run: [bold]cyan login[/bold]")
         raise typer.Exit(code=1)
@@ -1086,5 +1115,33 @@ def key_revoke(identifier: str):
     console.print(f"[yellow]✓ {res.get('message', 'API key revoked')}[/yellow]")
 
 
+@app.command()
+def login(username: str = typer.Option(None, "--username", "-u", help="Username"),
+          password: str = typer.Option(None, "--password", "-p", help="Password")):
+    """Log in to the Cyan Server Agent and save the CLI session token."""
+    if not username:
+        username = typer.prompt("Username", default="admin")
+    if not password:
+        password = typer.prompt("Password", hide_input=True)
+
+    res = _agent_post("/api/auth/login", {"username": username, "password": password}, auth=False)
+    token = res.get("access_token")
+    if token:
+        _save_token(token)
+        console.print(f"[green]✓ Logged in successfully as '{username}'[/green]")
+    else:
+        console.print(f"[red]✗ Login failed[/red]")
+
+
+@app.command()
+def resume():
+    """Universal Auto-Resume: Single-command restoration of the complete server stack.
+    Restores agent daemon, hosted websites, Caddy SSL domains, and public tunnels
+    after laptop restart, reboot, or system power-off."""
+    from cli.interactive import run_auto_resume
+    run_auto_resume()
+
+
 if __name__ == "__main__":
     app()
+
