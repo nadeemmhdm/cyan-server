@@ -733,6 +733,89 @@
       margin: 0 auto 12px auto;
       box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
     }
+
+    /* RESPONSIVE & MOBILE-FRIENDLY SYSTEM */
+    @media (max-width: 1024px) {
+      header { padding: 14px 20px; }
+      .tabs-nav { padding: 0 20px; }
+      main { padding: 20px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .brand h1 { font-size: 18px; }
+      .brand-icon { width: 32px; height: 32px; font-size: 18px; }
+      .header-right { gap: 8px; }
+      .user-pill { padding: 4px 8px; font-size: 12px; }
+      .user-avatar { width: 26px; height: 26px; font-size: 11px; }
+
+      .tabs-nav {
+        padding: 0 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .tabs-nav::-webkit-scrollbar { display: none; }
+      .tab-btn {
+        padding: 10px 14px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      main { padding: 16px 12px; }
+      .stats-grid { grid-template-columns: 1fr; gap: 12px; }
+      .action-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .action-bar > div:last-child {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        gap: 8px;
+      }
+      .action-bar > div:last-child .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+      }
+
+      .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: var(--radius-sm);
+        margin-left: -4px;
+        margin-right: -4px;
+      }
+      table { min-width: 650px; font-size: 12px; }
+      th, td { padding: 10px 12px; }
+
+      .modal {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        margin: 12px auto;
+        padding: 18px 16px;
+        max-height: 88vh;
+        overflow-y: auto;
+      }
+      .template-grid { grid-template-columns: 1fr; }
+      .welcome-banner { padding: 18px; }
+      .welcome-title { font-size: 17px; }
+      .welcome-quick-actions { flex-direction: column; }
+      .welcome-quick-actions .btn { width: 100%; justify-content: center; }
+    }
+
+    @media (max-width: 480px) {
+      .login-box { width: 92vw; padding: 24px 18px; }
+      .brand .version-tag { display: none; }
+      .tab-btn i { margin-right: 4px; }
+      .btn { padding: 8px 12px; font-size: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -754,6 +837,10 @@
           <input type="password" id="input-password" placeholder="Password" required autocomplete="current-password">
           <button type="button" class="btn-eye" onclick="togglePasswordVisibility()"><i class='bx bx-show' id="eye-icon"></i></button>
         </div>
+        <div class="input-with-icon" id="group-login-2fa" style="display:none; margin-top:10px">
+          <i class='bx bx-shield-quarter prefix-icon' style="color:var(--warn)"></i>
+          <input type="text" id="input-totp-code" placeholder="6-digit Authenticator Code" maxlength="6" inputmode="numeric" style="letter-spacing:4px; font-weight:700; font-family:'JetBrains Mono',monospace">
+        </div>
         <button type="submit" class="login-btn" id="btn-submit-login">
           <i class='bx bx-log-in-circle'></i> Sign In
         </button>
@@ -769,7 +856,7 @@
       <div>
         <h1>Cyan<span>Server</span></h1>
       </div>
-      <span class="version-tag">v0.7.1</span>
+      <span class="version-tag">v0.7.3</span>
     </a>
 
     <div class="header-right">
@@ -1012,8 +1099,8 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
           <h3 class="section-heading"><i class='bx bx-globe'></i> Hosted Websites & Applications</h3>
           <p style="font-size:13px; color:var(--muted); margin-top:2px">Deploy static, React, Node.js, Python, or PHP apps with Caddy SSL domains and public tunnels.</p>
         </div>
-        <div style="display:flex; gap:10px">
-          <button class="btn btn-secondary" onclick="handleAutoResumeDashboard()"><i class='bx bx-refresh'></i> Auto-Resume All</button>
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn btn-secondary" id="btn-auto-resume-all" onclick="handleAutoResumeDashboard()" style="background:linear-gradient(135deg, rgba(14,165,233,0.18), rgba(5,150,105,0.18)); border:1px solid rgba(34,211,238,0.4)" title="Restore all websites, SSL domains & tunnels after reboot"><i class='bx bx-sync'></i> 1-Click Restore All</button>
           <button class="btn btn-primary" onclick="openBuildWebsiteModal()"><i class='bx bx-plus-circle'></i> Build Website</button>
         </div>
       </div>
@@ -1184,7 +1271,17 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
           </div>
 
           <div id="source-sec-folder" style="display:none">
-            <input type="text" id="site-input-folder" class="form-input" placeholder="e.g. ./sites/my-site or C:/projects/my-site">
+            <div class="file-drop-zone" onclick="document.getElementById('site-folder-file-input').click()" style="margin-bottom:10px">
+              <i class='bx bx-folder-open'></i>
+              <strong style="display:block; font-size:13px; margin-bottom:4px">Select Local Website Folder</strong>
+              <span style="font-size:12px; color:var(--muted)" id="site-folder-hint">Click to choose your local project folder (HTML/CSS/JS or build output)</span>
+            </div>
+            <input type="file" id="site-folder-file-input" webkitdirectory directory multiple style="display:none" onchange="handleSiteFolderSelected(event)">
+            <div id="site-folder-summary" style="display:none; margin-bottom:8px; padding:8px 12px; border-radius:8px; background:rgba(34,211,238,0.1); border:1px solid var(--accent); font-size:12px; color:var(--accent)"></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:6px">
+              <span style="font-size:11px; color:var(--muted)">Or server path:</span>
+              <input type="text" id="site-input-folder" class="form-input" style="font-size:12px; padding:6px 10px" placeholder="e.g. ./sites/my-site or C:/projects/my-site">
+            </div>
           </div>
 
           <div id="source-sec-git" style="display:none">
@@ -1199,7 +1296,7 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
           </div>
           <div class="form-group">
             <label class="form-label">Custom Domain (Optional)</label>
-            <input type="text" id="site-input-domain" class="form-input" placeholder="e.g. app.mybrand.com">
+            <input type="text" id="site-input-domain" class="form-input" placeholder="e.g. app.mybrand.com" oninput="this.value = this.value.replace(/^https?:\/\//i, '').replace(/\/+$/, '')">
           </div>
         </div>
 
@@ -1232,7 +1329,7 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
         </p>
         <div class="form-group">
           <label class="form-label">Domain or Subdomain</label>
-          <input type="text" id="domain-input-val" class="form-input" placeholder="e.g. mysite.com or app.mysite.com">
+          <input type="text" id="domain-input-val" class="form-input" placeholder="e.g. mysite.com or app.mysite.com" oninput="this.value = this.value.replace(/^https?:\/\//i, '').replace(/\/+$/, '')">
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:22px">
           <button type="button" class="btn btn-danger" style="padding:8px 12px; font-size:12px" onclick="handleClearSiteDomain()"><i class='bx bx-trash'></i> Clear Domain</button>
@@ -1255,7 +1352,7 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       <form onsubmit="event.preventDefault(); handleConnectSiteTunnel();">
         <input type="hidden" id="tunnel-site-name">
         <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
-          Expose <strong id="tunnel-target-site" style="color:var(--text)"></strong> securely to the internet. Routes are automatically remembered for reboot survival.
+          Expose <strong id="tunnel-target-site" style="color:var(--text)"></strong> <span id="tunnel-target-port" style="color:var(--accent)"></span> securely to the internet. Routes are automatically remembered for reboot survival.
         </p>
         <div class="form-group">
           <label class="form-label">Tunnel Provider</label>
@@ -1274,7 +1371,7 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-site-tunnel')">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class='bx bx-link'></i> Connect Tunnel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-tunnel"><i class='bx bx-link'></i> Connect Tunnel</button>
         </div>
       </form>
     </div>
@@ -1363,6 +1460,73 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
             </div>
           </form>
         </div>
+
+        <!-- Two-Factor Authentication (2FA) Section -->
+        <div style="border-top:1px solid var(--border); padding-top:18px; margin-top:18px">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+            <h4 style="font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px">
+              <i class='bx bx-shield-quarter' style="color:var(--accent2)"></i> Two-Factor Auth (TOTP 2FA)
+            </h4>
+            <span id="profile-2fa-badge" class="badge badge-warn">Disabled</span>
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:14px">
+            Protect your administrator login with Google Authenticator, Authy, or 1Password.
+          </p>
+
+          <!-- When 2FA is currently Disabled -->
+          <div id="sec-2fa-disabled-view">
+            <button type="button" class="btn btn-secondary" style="width:100%; justify-content:center; border-color:var(--border-accent)" onclick="start2FASetup()">
+              <i class='bx bx-qr-scan'></i> Enable Two-Factor Authentication
+            </button>
+          </div>
+
+          <!-- When 2FA is currently Enabled -->
+          <div id="sec-2fa-enabled-view" style="display:none">
+            <div style="background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.3); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--accent2); margin-bottom:12px; display:flex; align-items:center; gap:8px">
+              <i class='bx bx-check-shield' style="font-size:18px"></i> 2FA is active. Every login requires your 6-digit TOTP code.
+            </div>
+            <div id="sec-2fa-disable-form" style="display:none; margin-bottom:12px">
+              <div class="form-group">
+                <label class="form-label">Confirm Admin Password to Disable 2FA</label>
+                <input type="password" id="input-2fa-disable-pwd" class="form-input" placeholder="Enter current admin password">
+              </div>
+              <div style="display:flex; gap:8px">
+                <button type="button" class="btn btn-secondary" style="font-size:12px; padding:6px 12px" onclick="document.getElementById('sec-2fa-disable-form').style.display='none'">Cancel</button>
+                <button type="button" class="btn btn-danger" style="font-size:12px; padding:6px 12px" onclick="confirmDisable2FA()"><i class='bx bx-lock-open'></i> Confirm Disable</button>
+              </div>
+            </div>
+            <button type="button" id="btn-toggle-disable-2fa" class="btn btn-danger" style="width:100%; justify-content:center; font-size:12px; padding:8px" onclick="document.getElementById('sec-2fa-disable-form').style.display='block'">
+              <i class='bx bx-lock-open'></i> Disable 2FA
+            </button>
+          </div>
+
+          <!-- Active 2FA Setup View (QR code + Code input) -->
+          <div id="sec-2fa-setup-view" style="display:none; background:var(--panel-solid); border:1px solid var(--border-accent); border-radius:12px; padding:16px; margin-top:10px">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+              <strong style="font-size:13px; color:var(--accent)">Scan QR with Authenticator App</strong>
+              <button type="button" class="btn-close" style="font-size:16px" onclick="cancel2FASetup()">&times;</button>
+            </div>
+            <div style="text-align:center; margin-bottom:12px">
+              <div id="qrcode-container" style="background:#ffffff; padding:12px; border-radius:10px; display:inline-block; margin-bottom:10px">
+                <img id="img-2fa-qr" src="" alt="2FA QR Code" style="width:160px; height:160px; display:block">
+              </div>
+              <div style="font-size:11px; color:var(--muted); margin-bottom:4px">Or enter secret key manually:</div>
+              <div style="display:flex; align-items:center; justify-content:center; gap:6px">
+                <code id="txt-2fa-secret" style="font-size:12px; font-weight:700; color:var(--text); letter-spacing:1px; background:#070a0f; padding:4px 8px; border-radius:6px; border:1px solid var(--border)"></code>
+                <button type="button" class="btn btn-secondary" style="padding:4px 8px; font-size:11px" onclick="copy2FASecret()" title="Copy Key"><i class='bx bx-copy'></i></button>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:10px">
+              <label class="form-label">Enter 6-Digit Code from App</label>
+              <input type="text" id="input-2fa-verify-code" class="form-input" placeholder="e.g. 123456" maxlength="6" inputmode="numeric" style="letter-spacing:4px; font-weight:700; text-align:center; font-family:'JetBrains Mono',monospace">
+            </div>
+            <div id="status-2fa-setup" style="font-size:12px; margin-bottom:10px"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px">
+              <button type="button" class="btn btn-secondary" style="font-size:12px; padding:6px 12px" onclick="cancel2FASetup()">Cancel</button>
+              <button type="button" class="btn btn-primary" style="font-size:12px; padding:6px 12px" id="btn-confirm-enable-2fa" onclick="confirmEnable2FA()"><i class='bx bx-check'></i> Verify & Turn On</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1391,9 +1555,13 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       }
     }
 
+    let loginRequires2FA = false;
+
     async function handleLogin() {
       const user = document.getElementById("input-username").value.trim();
       const pass = document.getElementById("input-password").value;
+      const codeInput = document.getElementById("input-totp-code");
+      const code = codeInput ? codeInput.value.trim() : null;
       const statusMsg = document.getElementById("login-status-msg");
       const btn = document.getElementById("btn-submit-login");
 
@@ -1402,16 +1570,32 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       btn.disabled = true;
 
       try {
+        const payload = { username: user, password: pass };
+        if (loginRequires2FA && code) {
+          payload.totp_code = code;
+        }
+
         const res = await fetch(AGENT + "/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: user, password: pass }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!res.ok) {
           statusMsg.textContent = data.detail || "Authentication failed.";
           statusMsg.style.color = "var(--danger)";
           btn.disabled = false;
+          return;
+        }
+
+        if (data.require_2fa) {
+          loginRequires2FA = true;
+          document.getElementById("group-login-2fa").style.display = "block";
+          document.getElementById("input-totp-code").focus();
+          statusMsg.textContent = "2FA Active: Enter 6-digit Authenticator code";
+          statusMsg.style.color = "var(--warn)";
+          btn.disabled = false;
+          btn.innerHTML = "<i class='bx bx-shield-quarter'></i> Verify 2FA & Sign In";
           return;
         }
 
@@ -1422,6 +1606,7 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
 
         statusMsg.textContent = "Login successful!";
         statusMsg.style.color = "var(--accent2)";
+        loginRequires2FA = false;
         setTimeout(() => {
           btn.disabled = false;
           checkAuth();
@@ -1601,7 +1786,18 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
 
     async function handleCreateDatabase() {
       const name = document.getElementById("db-input-name").value.trim();
-      const engine = document.getElementById("db-input-engine").value;
+      let engine = document.getElementById("db-input-engine").value;
+
+      if (engine === "postgres" && !DB_ENGINES.postgres) {
+        if (confirm("PostgreSQL is not installed on this host (psql/createdb not found).\n\nWould you like to create this database using SQLite instead (Ready, Zero-config & Full SQL query support)?")) {
+          engine = "sqlite";
+          document.getElementById("db-input-engine").value = "sqlite";
+          handleEngineChange();
+        } else {
+          return;
+        }
+      }
+
       try {
         const res = await fetch(AGENT + "/api/database", {
           method: "POST",
@@ -1610,6 +1806,22 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
         });
         if (!res.ok) {
           const err = await res.json();
+          if (err.detail && err.detail.includes("PostgreSQL is not installed")) {
+            if (confirm("PostgreSQL is not installed on this host.\n\nWould you like to automatically provision this database using SQLite instead?")) {
+              const retryRes = await fetch(AGENT + "/api/database", {
+                method: "POST",
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ name, engine: "sqlite" })
+              });
+              if (retryRes.ok) {
+                closeModal("modal-create-db");
+                document.getElementById("db-input-name").value = "";
+                loadDatabases();
+                alert(`✓ Database "${name}" successfully provisioned with SQLite!`);
+                return;
+              }
+            }
+          }
           alert("Error: " + (err.detail || "Failed to create database"));
           return;
         }
@@ -1894,17 +2106,44 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
             ? `<span style="font-weight:600; color:var(--accent); display:inline-flex; align-items:center; gap:4px"><i class='bx bx-check-shield' style="color:var(--accent2)"></i> ${s.domain}</span>` 
             : `<span style="color:var(--muted)">None</span>`;
 
+          const isTunnelActive = s.tunnel && s.tunnel.active;
+          const tunnelHost = (s.tunnel && s.tunnel.hostname) || s.domain;
+          const hasTunnelRoute = (s.tunnel && s.tunnel.hostname) || false;
+
+          let tunnelDisplay = "";
+          if (isTunnelActive && tunnelHost) {
+            tunnelDisplay = `
+              <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap">
+                <span class="badge badge-ok" style="display:inline-flex; align-items:center; gap:4px; font-size:11px" title="Tunnel is live & accepting traffic">
+                  <i class='bx bx-broadcast bx-flashing' style="color:var(--accent2)"></i> Live
+                </span>
+                <a href="https://${tunnelHost}" target="_blank" class="btn btn-secondary" style="padding:2px 6px; font-size:10px; text-decoration:none" title="Visit Public Tunnel"><i class='bx bx-link-external'></i> ${tunnelHost}</a>
+                <button class="btn btn-secondary" style="padding:2px 6px; font-size:10px" onclick="handleDisconnectSiteTunnel('${s.name}')" title="Disconnect Tunnel"><i class='bx bx-unlink'></i></button>
+              </div>
+            `;
+          } else if (hasTunnelRoute && !isTunnelActive) {
+            tunnelDisplay = `
+              <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap">
+                <span class="badge badge-warning" style="font-size:11px" title="Tunnel route saved but daemon paused">Offline</span>
+                <button class="btn btn-primary" style="padding:2px 6px; font-size:10px" onclick="handleStartSiteTunnel('${s.name}')" title="Start Tunnel"><i class='bx bx-play'></i> Start</button>
+                <button class="btn btn-secondary" style="padding:2px 6px; font-size:10px" onclick="handleDisconnectSiteTunnel('${s.name}')" title="Remove Tunnel Route"><i class='bx bx-trash'></i></button>
+              </div>
+            `;
+          } else {
+            tunnelDisplay = `
+              <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="openSiteTunnelModal('${s.name}', ${s.port}, '${s.domain || ''}')">
+                <i class='bx bx-broadcast'></i> Connect
+              </button>
+            `;
+          }
+
           return `
             <tr>
               <td><strong><i class='bx bx-window-alt' style="color:var(--accent); margin-right:6px"></i>${s.name}</strong></td>
               <td><span class="badge badge-ok">${s.site_type}</span></td>
               <td><code>${s.port}</code></td>
               <td>${domainDisplay}</td>
-              <td>
-                <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="openSiteTunnelModal('${s.name}', ${s.port})">
-                  <i class='bx bx-broadcast'></i> Connect
-                </button>
-              </td>
+              <td>${tunnelDisplay}</td>
               <td><span class="badge ${isRunning ? 'badge-ok' : 'badge-danger'}">${s.status}</span></td>
               <td>
                 <div style="display:flex; gap:4px; flex-wrap:wrap">
@@ -1948,9 +2187,42 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       selectedSiteZipFile = null;
       document.getElementById("site-zip-filename").textContent = "";
       document.getElementById("site-zip-file-input").value = "";
-      selectSourceTab("template");
 
+      // Reset folder picker
+      selectedSiteFolderFiles = null;
+      const folderInput = document.getElementById("site-folder-file-input");
+      if (folderInput) folderInput.value = "";
+      const folderSummary = document.getElementById("site-folder-summary");
+      if (folderSummary) folderSummary.style.display = "none";
+      const folderHint = document.getElementById("site-folder-hint");
+      if (folderHint) folderHint.textContent = "Click to choose your local project folder (HTML/CSS/JS or build output)";
+
+      selectSourceTab("template");
       openModal("modal-build-website");
+    }
+
+    let selectedSiteFolderFiles = null;
+
+    function handleSiteFolderSelected(e) {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      selectedSiteFolderFiles = files;
+      const firstRel = files[0].webkitRelativePath || "";
+      const folderName = firstRel.split("/")[0] || "Selected Folder";
+
+      const summaryEl = document.getElementById("site-folder-summary");
+      if (summaryEl) {
+        summaryEl.style.display = "block";
+        summaryEl.innerHTML = `<i class='bx bx-check-circle'></i> <strong>${folderName}</strong>: ${files.length} file(s) selected ready to upload`;
+      }
+      const hintEl = document.getElementById("site-folder-hint");
+      if (hintEl) hintEl.textContent = `${files.length} file(s) selected from "${folderName}"`;
+
+      const nameInput = document.getElementById("site-input-name");
+      if (nameInput && (!nameInput.value || nameInput.value === "my-awesome-site")) {
+        nameInput.value = folderName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+        handleSiteNameChange();
+      }
     }
 
     function handleSiteNameChange() {
@@ -1991,7 +2263,10 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       const name = document.getElementById("site-input-name").value.trim();
       const siteType = document.getElementById("site-input-type").value;
       const port = parseInt(document.getElementById("site-input-port").value, 10);
-      const domain = document.getElementById("site-input-domain").value.trim() || null;
+      let domain = document.getElementById("site-input-domain").value.trim() || null;
+      if (domain) {
+        domain = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+      }
       const deploy = document.getElementById("site-input-deploy").checked;
       const activeTab = document.querySelector(".source-tab-btn.active")?.id?.replace("stab-", "") || "template";
 
@@ -2052,6 +2327,24 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
             const zipErr = await zipRes.json();
             alert("Site created, but ZIP extraction encountered an issue: " + (zipErr.detail || "Check file"));
           }
+        } else if (activeTab === "folder" && selectedSiteFolderFiles && selectedSiteFolderFiles.length > 0) {
+          btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Uploading ${selectedSiteFolderFiles.length} file(s)…`;
+          const fd = new FormData();
+          const relPaths = [];
+          for (const f of selectedSiteFolderFiles) {
+            fd.append("files", f);
+            relPaths.push(f.webkitRelativePath || f.name);
+          }
+          fd.append("paths", JSON.stringify(relPaths));
+          const folderRes = await fetch(AGENT + `/api/web/${name}/files/upload-folder`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: fd
+          });
+          if (!folderRes.ok) {
+            const folderErr = await folderRes.json();
+            alert("Site created, but folder upload encountered an issue: " + (folderErr.detail || "Check folder files"));
+          }
         }
 
         if (deploy) {
@@ -2106,7 +2399,10 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
 
     async function handleSaveSiteDomain() {
       const name = document.getElementById("domain-site-name").value;
-      const domain = document.getElementById("domain-input-val").value.trim() || null;
+      let domain = document.getElementById("domain-input-val").value.trim() || null;
+      if (domain) {
+        domain = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+      }
       try {
         const res = await fetch(AGENT + `/api/web/${name}/domain`, {
           method: "POST",
@@ -2139,50 +2435,70 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
     }
 
     // TUNNEL MODAL HANDLERS
-    function openSiteTunnelModal(name, port) {
-      document.getElementById("tunnel-site-name").value = name;
-      document.getElementById("tunnel-target-site").textContent = name;
-      document.getElementById("tunnel-target-port").textContent = port;
-      document.getElementById("tunnel-cf-name").value = name + "-tunnel";
-      document.getElementById("tunnel-cf-hostname").value = name + ".mydomain.com";
-      document.getElementById("tunnel-ngrok-domain").value = "";
-      selectTunnelProvider("cloudflare");
+    async function openSiteTunnelModal(name, port, existingDomain) {
+      const siteNameInput = document.getElementById("tunnel-site-name");
+      if (siteNameInput) siteNameInput.value = name;
+      const targetSiteEl = document.getElementById("tunnel-target-site");
+      if (targetSiteEl) targetSiteEl.textContent = name;
+      const targetPortEl = document.getElementById("tunnel-target-port");
+      if (targetPortEl) targetPortEl.textContent = port ? `(Port ${port})` : "";
+
+      const providerSelect = document.getElementById("tunnel-input-provider");
+      if (providerSelect) providerSelect.value = "cloudflare";
+
+      let defaultTunnel = "cyan-tunnel";
+      try {
+        const cfg = await fetch(AGENT + "/api/tunnel-connect/default-config", { headers: authHeaders() }).then(r => r.json());
+        if (cfg && (cfg.default_tunnel_name || cfg.active_tunnel)) {
+          defaultTunnel = cfg.active_tunnel || cfg.default_tunnel_name;
+        }
+      } catch (e) {}
+
+      const tunnelNameInput = document.getElementById("tunnel-input-name");
+      if (tunnelNameInput) tunnelNameInput.value = defaultTunnel;
+
+      const hostnameInput = document.getElementById("tunnel-input-hostname");
+      if (hostnameInput) {
+        hostnameInput.value = existingDomain && existingDomain !== "null" ? existingDomain : (name + ".mydomain.com");
+      }
+
+      handleTunnelProviderChange();
       openModal("modal-site-tunnel");
     }
 
-    function selectTunnelProvider(provider) {
-      const cfSec = document.getElementById("tunnel-sec-cloudflare");
-      const ngSec = document.getElementById("tunnel-sec-ngrok");
-      const cfBtn = document.getElementById("tbtn-cf");
-      const ngBtn = document.getElementById("tbtn-ngrok");
+    function handleTunnelProviderChange() {
+      const provider = document.getElementById("tunnel-input-provider")?.value || "cloudflare";
+      const cfGroup = document.getElementById("group-cf-tunnel");
+      const lblHostname = document.getElementById("lbl-tunnel-hostname");
+      const inputHostname = document.getElementById("tunnel-input-hostname");
+
       if (provider === "cloudflare") {
-        cfSec.style.display = "block";
-        ngSec.style.display = "none";
-        cfBtn.className = "btn btn-primary";
-        ngBtn.className = "btn btn-secondary";
+        if (cfGroup) cfGroup.style.display = "block";
+        if (lblHostname) lblHostname.textContent = "Public Hostname";
+        if (inputHostname) inputHostname.placeholder = "e.g. site.mybrand.com";
       } else {
-        cfSec.style.display = "none";
-        ngSec.style.display = "block";
-        ngBtn.className = "btn btn-primary";
-        cfBtn.className = "btn btn-secondary";
+        if (cfGroup) cfGroup.style.display = "none";
+        if (lblHostname) lblHostname.textContent = "ngrok Custom Domain (Optional)";
+        if (inputHostname) inputHostname.placeholder = "Leave blank for free random ngrok URL or enter domain";
       }
     }
 
     async function handleConnectSiteTunnel() {
-      const name = document.getElementById("tunnel-site-name").value;
-      const isCf = document.getElementById("tunnel-sec-cloudflare").style.display !== "none";
+      const name = document.getElementById("tunnel-site-name")?.value;
+      if (!name) return;
+      const provider = document.getElementById("tunnel-input-provider")?.value || "cloudflare";
       const btn = document.getElementById("btn-submit-tunnel");
-      btn.disabled = true;
-      btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Connecting…";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Connecting…";
+      }
 
       try {
-        if (isCf) {
-          const tunnelName = document.getElementById("tunnel-cf-name").value.trim();
-          const hostname = document.getElementById("tunnel-cf-hostname").value.trim();
-          if (!tunnelName || !hostname) {
-            alert("Please enter both tunnel name and hostname");
-            btn.disabled = false;
-            btn.innerHTML = "<i class='bx bx-broadcast'></i> Connect Tunnel";
+        if (provider === "cloudflare") {
+          const tunnelName = document.getElementById("tunnel-input-name")?.value.trim() || (name + "-tunnel");
+          const hostname = document.getElementById("tunnel-input-hostname")?.value.trim();
+          if (!hostname) {
+            alert("Please enter a public hostname for the Cloudflare tunnel");
             return;
           }
           const res = await fetch(AGENT + "/api/tunnel-connect/cloudflare", {
@@ -2194,11 +2510,12 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
           if (!res.ok) {
             alert("Cloudflare tunnel error: " + (data.detail || "Check cloudflared installation"));
           } else {
-            alert(`✓ Cloudflare Tunnel Connected!\nHostname: ${hostname}\nRoute saved for automatic reboot recovery.`);
+            alert(`✓ Cloudflare Tunnel Connected!\nHostname: ${hostname}\nLive tunnel daemon started & route saved for automatic reboot recovery.`);
             closeModal("modal-site-tunnel");
+            loadWebsites();
           }
         } else {
-          const hostname = document.getElementById("tunnel-ngrok-domain").value.trim() || null;
+          const hostname = document.getElementById("tunnel-input-hostname")?.value.trim() || null;
           const res = await fetch(AGENT + "/api/tunnel-connect/ngrok", {
             method: "POST",
             headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -2210,20 +2527,91 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
           } else {
             alert(`✓ Ngrok Tunnel Connected!\nPublic URL: ${data.public_url || "Active"}`);
             closeModal("modal-site-tunnel");
+            loadWebsites();
           }
         }
       } catch (e) {
         alert("Connection error: " + e.message);
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = "<i class='bx bx-broadcast'></i> Connect Tunnel";
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = "<i class='bx bx-link'></i> Connect Tunnel";
+        }
+      }
+    }
+
+    async function handleDisconnectSiteTunnel(name) {
+      if (!confirm(`Disconnect public tunnel for site "${name}"?`)) return;
+      try {
+        const res = await fetch(AGENT + `/api/tunnel-connect/${name}/disconnect`, {
+          method: "POST",
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          loadWebsites();
+        } else {
+          alert("Failed to disconnect tunnel");
+        }
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    async function handleStartSiteTunnel(name) {
+      try {
+        const res = await fetch(AGENT + `/api/tunnel-connect/${name}/start`, {
+          method: "POST",
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          loadWebsites();
+        } else {
+          alert("Failed to start tunnel daemon");
+        }
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    // 1-CLICK REBOOT RECOVERY (ALL SITES, DOMAINS, TUNNELS)
+    async function handleAutoResumeDashboard() {
+      const btn = event?.currentTarget || document.getElementById("btn-auto-resume-all");
+      let origHtml = "";
+      if (btn) {
+        origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Restoring Stack…";
+      }
+      try {
+        const res = await fetch(AGENT + "/api/resume", {
+          method: "POST",
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const siteCount = (data.recovered_sites || []).length;
+          const tunnelStatus = data.tunnel_started ? "Live" : "Offline";
+          const domainCount = (data.domains || []).length;
+          alert(`✓ Full Stack Restored!\n\n• Recovered Sites: ${siteCount}\n• SSL Domains: ${domainCount}\n• Public Tunnel (${data.provider || 'Cloudflare'}): ${tunnelStatus}\n\nAll services, domains, and tunnels are up and running!`);
+          loadWebsites();
+        } else {
+          alert("Auto-resume encountered an issue: " + (data.detail || "Server error"));
+        }
+      } catch (e) {
+        alert("Connection error: " + e.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml || "<i class='bx bx-sync'></i> 1-Click Restore All";
+        }
       }
     }
 
     // SITE FILES MODAL HANDLERS
     function openSiteFilesModal(name) {
       currentActiveSiteName = name;
-      document.getElementById("files-site-name").textContent = name;
+      const targetEl = document.getElementById("files-target-site") || document.getElementById("files-site-name");
+      if (targetEl) targetEl.textContent = name;
       loadSiteFiles(name);
       openModal("modal-site-files");
     }
@@ -2314,7 +2702,8 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
     // SITE LOGS MODAL HANDLERS
     function openSiteLogsModal(name) {
       currentLogsSite = name;
-      document.getElementById("logs-site-name").textContent = name;
+      const targetEl = document.getElementById("logs-target-site") || document.getElementById("logs-site-name");
+      if (targetEl) targetEl.textContent = name;
       openModal("modal-site-logs");
       refreshSiteLogs();
     }
@@ -2331,7 +2720,9 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       }
     }
 
-    // ADMIN PROFILE & PASSWORD CHANGE
+    // ADMIN PROFILE, PASSWORD CHANGE & TOTP 2FA
+    let currentProfile2FAEnabled = false;
+
     async function openProfileModal() {
       try {
         const me = await fetch(AGENT + "/api/auth/me", { headers: authHeaders() }).then(r => r.json());
@@ -2339,12 +2730,156 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
           document.getElementById("profile-name").textContent = me.username;
           document.getElementById("profile-avatar").textContent = me.username.slice(0, 2).toUpperCase();
         }
+        currentProfile2FAEnabled = !!me.totp_enabled;
+        updateProfile2FAViews();
       } catch (e) {}
+
       document.getElementById("pwd-input-current").value = "";
       document.getElementById("pwd-input-new").value = "";
       document.getElementById("pwd-input-confirm").value = "";
       document.getElementById("pwd-status-msg").textContent = "";
       openModal("modal-profile");
+    }
+
+    function updateProfile2FAViews() {
+      const badge = document.getElementById("profile-2fa-badge");
+      const disabledView = document.getElementById("sec-2fa-disabled-view");
+      const enabledView = document.getElementById("sec-2fa-enabled-view");
+      const setupView = document.getElementById("sec-2fa-setup-view");
+      const disableForm = document.getElementById("sec-2fa-disable-form");
+
+      if (setupView) setupView.style.display = "none";
+      if (disableForm) disableForm.style.display = "none";
+
+      if (currentProfile2FAEnabled) {
+        if (badge) {
+          badge.textContent = "Active";
+          badge.className = "badge badge-ok";
+        }
+        if (disabledView) disabledView.style.display = "none";
+        if (enabledView) enabledView.style.display = "block";
+      } else {
+        if (badge) {
+          badge.textContent = "Disabled";
+          badge.className = "badge badge-warn";
+        }
+        if (disabledView) disabledView.style.display = "block";
+        if (enabledView) enabledView.style.display = "none";
+      }
+    }
+
+    async function start2FASetup() {
+      const statusEl = document.getElementById("status-2fa-setup");
+      if (statusEl) statusEl.textContent = "Generating 2FA secret…";
+      try {
+        const res = await fetch(AGENT + "/api/auth/2fa/setup", {
+          method: "POST",
+          headers: authHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert("Could not initialize 2FA: " + (data.detail || "Server error"));
+          return;
+        }
+
+        document.getElementById("txt-2fa-secret").textContent = data.secret;
+        const qrImg = document.getElementById("img-2fa-qr");
+        if (qrImg) {
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(data.otpauth_url)}`;
+        }
+        document.getElementById("input-2fa-verify-code").value = "";
+        if (statusEl) statusEl.textContent = "";
+
+        document.getElementById("sec-2fa-disabled-view").style.display = "none";
+        document.getElementById("sec-2fa-enabled-view").style.display = "none";
+        document.getElementById("sec-2fa-setup-view").style.display = "block";
+        document.getElementById("input-2fa-verify-code").focus();
+      } catch (err) {
+        alert("Failed to start 2FA setup: " + err.message);
+      }
+    }
+
+    function copy2FASecret() {
+      const secret = document.getElementById("txt-2fa-secret").textContent;
+      if (secret && navigator.clipboard) {
+        navigator.clipboard.writeText(secret);
+        alert("Secret key copied to clipboard:\n" + secret);
+      }
+    }
+
+    function cancel2FASetup() {
+      updateProfile2FAViews();
+    }
+
+    async function confirmEnable2FA() {
+      const code = document.getElementById("input-2fa-verify-code").value.trim();
+      const statusEl = document.getElementById("status-2fa-setup");
+      const btn = document.getElementById("btn-confirm-enable-2fa");
+
+      if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+        if (statusEl) {
+          statusEl.textContent = "Please enter a valid 6-digit code.";
+          statusEl.style.color = "var(--danger)";
+        }
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Verifying…";
+
+      try {
+        const res = await fetch(AGENT + "/api/auth/2fa/enable", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          if (statusEl) {
+            statusEl.textContent = data.detail || "Invalid code. Please recheck your app.";
+            statusEl.style.color = "var(--danger)";
+          }
+        } else {
+          currentProfile2FAEnabled = true;
+          updateProfile2FAViews();
+          alert("✓ Two-Factor Authentication is now enabled!\nYour account is protected by TOTP.");
+        }
+      } catch (err) {
+        if (statusEl) {
+          statusEl.textContent = "Server error: " + err.message;
+          statusEl.style.color = "var(--danger)";
+        }
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<i class='bx bx-check'></i> Verify & Turn On";
+      }
+    }
+
+    async function confirmDisable2FA() {
+      const pwd = document.getElementById("input-2fa-disable-pwd").value;
+      if (!pwd) {
+        alert("Please enter your current password to disable 2FA.");
+        return;
+      }
+
+      try {
+        const res = await fetch(AGENT + "/api/auth/2fa/disable", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pwd })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert("Could not disable 2FA: " + (data.detail || "Invalid password"));
+          return;
+        }
+        currentProfile2FAEnabled = false;
+        document.getElementById("input-2fa-disable-pwd").value = "";
+        updateProfile2FAViews();
+        alert("Two-Factor Authentication has been disabled.");
+      } catch (err) {
+        alert("Server error: " + err.message);
+      }
     }
 
     async function handleChangePassword() {

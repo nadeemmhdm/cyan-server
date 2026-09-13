@@ -36,10 +36,17 @@ class DatabaseError(Exception):
 
 
 def postgres_available() -> bool:
-    return shutil.which("psql") is not None and shutil.which("createdb") is not None
+    if shutil.which("psql") is not None and shutil.which("createdb") is not None:
+        return True
+    if os.name == "nt":
+        for pg_bin in Path("C:/Program Files/PostgreSQL").glob("*/bin"):
+            if (pg_bin / "psql.exe").exists() and (pg_bin / "createdb.exe").exists():
+                os.environ["PATH"] = str(pg_bin) + os.pathsep + os.environ.get("PATH", "")
+                return True
+    return False
 
 
-def create_database(name: str, engine: str = "sqlite") -> ManagedDatabase:
+def create_database(name: str, engine: str = "sqlite", auto_fallback: bool = True) -> ManagedDatabase:
     if not name.replace("_", "").isalnum():
         raise DatabaseError("Database name must be alphanumeric/underscore only")
 
@@ -50,7 +57,21 @@ def create_database(name: str, engine: str = "sqlite") -> ManagedDatabase:
     finally:
         session.close()
 
-    if engine == "sqlite":
+    actual_engine = engine
+    fallback_used = False
+
+    if engine == "postgres":
+        if not postgres_available():
+            if auto_fallback:
+                actual_engine = "sqlite"
+                fallback_used = True
+            else:
+                raise DatabaseError(
+                    "PostgreSQL is not installed on this host (psql/createdb not found). "
+                    "Install it via your platform's PackageManager, then retry."
+                )
+
+    if actual_engine == "sqlite":
         db_path = _sqlite_dir() / f"{name}.sqlite"
         if db_path.exists():
             raise DatabaseError(f"A SQLite file for '{name}' already exists at {db_path}")
@@ -62,13 +83,11 @@ def create_database(name: str, engine: str = "sqlite") -> ManagedDatabase:
         conn.commit()
         conn.close()
         connection_info = {"path": str(db_path)}
+        if fallback_used:
+            connection_info["fallback_from"] = "postgres"
+            connection_info["note"] = "Host lacks PostgreSQL binaries; automatically provisioned as SQLite."
 
-    elif engine == "postgres":
-        if not postgres_available():
-            raise DatabaseError(
-                "PostgreSQL is not installed on this host (psql/createdb not found). "
-                "Install it via your platform's PackageManager, then retry."
-            )
+    elif actual_engine == "postgres":
         result = subprocess.run(["createdb", name], capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
             raise DatabaseError(f"createdb failed: {result.stderr}")
@@ -80,7 +99,7 @@ def create_database(name: str, engine: str = "sqlite") -> ManagedDatabase:
     session = get_session()
     try:
         unique_id = generate_unique_id(name)
-        row = ManagedDatabase(name=name, unique_id=unique_id, engine=engine, connection_info=json.dumps(connection_info))
+        row = ManagedDatabase(name=name, unique_id=unique_id, engine=actual_engine, connection_info=json.dumps(connection_info))
         session.add(row)
         session.commit()
         session.refresh(row)

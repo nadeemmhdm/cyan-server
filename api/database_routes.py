@@ -49,12 +49,13 @@ def get_database_engines(_=Depends(require_auth)):
 class CreateDatabaseRequest(BaseModel):
     name: str
     engine: str = "sqlite"
+    auto_fallback: bool = True
 
 
 @router.post("")
 def create_database(req: CreateDatabaseRequest, _=Depends(require_auth)):
     try:
-        return _serialize(db_manager.create_database(req.name, req.engine))
+        return _serialize(db_manager.create_database(req.name, req.engine, auto_fallback=req.auto_fallback))
     except db_manager.DatabaseError as e:
         raise HTTPException(400, str(e))
 

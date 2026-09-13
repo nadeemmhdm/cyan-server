@@ -395,8 +395,17 @@ def delete_site(name: str, permanent: bool = False) -> None:
 
     if permanent:
         import shutil as _shutil
+        import stat
+        def _onerror(func, path, exc_info):
+            try:
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            except Exception:
+                pass
         if site_dir.exists():
-            _shutil.rmtree(site_dir)
+            _shutil.rmtree(site_dir, onerror=_onerror)
+            if site_dir.exists():
+                _shutil.rmtree(site_dir, ignore_errors=True)
     elif site_dir.exists() and any(site_dir.iterdir()):
         from trash.manager import move_to_trash
         move_to_trash("website", name, name, site_dir, metadata=site_snapshot)

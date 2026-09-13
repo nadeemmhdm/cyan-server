@@ -28,25 +28,132 @@ def get_site_port(site_name: str) -> int:
     raise TunnelConnectError(f"Site '{site_name}' not found — check `cyan web list`")
 
 
-def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str) -> dict:
+import re
+from pathlib import Path
+
+
+def _sync_tunnel_config_yaml(tunnel_name: str, hostname: str, port: int) -> None:
+    """Ensure tunnel_config.yml or ~/.cloudflared/config.yml has this hostname ingress rule configured."""
+    candidates = [
+        Path.cwd() / "tunnel_config.yml",
+        Path.home() / ".cloudflared" / "config.yml",
+        Path.home() / ".cyan-server" / "tunnel_config.yml"
+    ]
+    for cfg_path in candidates:
+        if cfg_path.exists():
+            try:
+                content = cfg_path.read_text(encoding="utf-8")
+                # Fix any localhost:80 to 127.0.0.1:80 for IPv6 loopback safety
+                content = content.replace("http://localhost:80", "http://127.0.0.1:80")
+                if f"hostname: {hostname}" in content:
+                    cfg_path.write_text(content, encoding="utf-8")
+                    continue
+                new_rule = f"  - hostname: {hostname}\n    service: http://127.0.0.1:80\n"
+                if "ingress:" in content:
+                    if "- service: http_status:404" in content:
+                        content = content.replace("  - service: http_status:404", f"{new_rule}  - service: http_status:404")
+                    else:
+                        content += f"\n{new_rule}"
+                else:
+                    content += f"\ningress:\n{new_rule}  - service: http_status:404\n"
+                cfg_path.write_text(content, encoding="utf-8")
+            except Exception:
+                pass
+
+
+def get_default_tunnel_name() -> str:
+    candidates = [
+        Path.cwd() / "tunnel_config.yml",
+        Path.home() / ".cloudflared" / "config.yml",
+        Path.home() / ".cyan-server" / "tunnel_config.yml"
+    ]
+    for c in candidates:
+        if c.exists():
+            try:
+                for line in c.read_text(encoding="utf-8").splitlines():
+                    if line.strip().startswith("tunnel:"):
+                        val = line.split(":", 1)[1].strip()
+                        if val:
+                            return val
+            except Exception:
+                pass
+    return "cyan-tunnel"
+
+
+def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str | None = None) -> dict:
     from cloudflare.manager import add_hostname, TunnelError
-    from tunnel.state import record_tunnel_route
+    from tunnel.state import record_tunnel_route, restart_cloudflared_tunnel
+    import web.manager as web_manager
+
+    default_name = get_default_tunnel_name()
+    if not tunnel_name or (tunnel_name.endswith("-tunnel") and tunnel_name != default_name and default_name == "cyan-tunnel"):
+        tunnel_name = default_name
+
+    clean_host = re.sub(r"^https?://", "", hostname.strip()).rstrip("/")
     port = get_site_port(site_name)
+
+    # Automatically set domain on the site if not already set, reloading Caddy
     try:
-        route = add_hostname(tunnel_name, hostname, f"http://localhost:{port}")
-        record_tunnel_route(tunnel_name=tunnel_name, provider="cloudflare", site_name=site_name, hostname=hostname, port=port)
-    except TunnelError as e:
-        raise TunnelConnectError(str(e))
-    return {"site": site_name, "hostname": route.hostname, "local_service": route.local_service}
+        site = web_manager.get_site(site_name)
+        if site and (not site.domain or site.domain != clean_host):
+            web_manager.set_domain(site_name, clean_host)
+    except Exception:
+        pass
+
+    # Add hostname route to cloudflared
+    try:
+        add_hostname(tunnel_name, clean_host, f"http://127.0.0.1:{port}")
+    except TunnelError:
+        pass
+
+    # Auto-generate / sync tunnel_config.yml ingress rules
+    _sync_tunnel_config_yaml(tunnel_name, clean_host, port)
+
+    # Persist state for reboot recovery
+    record_tunnel_route(tunnel_name=tunnel_name, provider="cloudflare", site_name=site_name, hostname=clean_host, port=port)
+
+    # Actively launch or refresh the background cloudflared daemon
+    tunnel_started = restart_cloudflared_tunnel(tunnel_name)
+
+    return {
+        "site": site_name,
+        "hostname": clean_host,
+        "local_service": f"http://127.0.0.1:{port}",
+        "tunnel_started": tunnel_started,
+        "status": "connected" if tunnel_started else "route_saved"
+    }
+
+
+def disconnect_site_tunnel(site_name: str) -> dict:
+    """Disconnect and clean up public tunnel route for a site."""
+    from tunnel.state import load_tunnel_state, save_tunnel_state, stop_cloudflared_tunnel
+    state = load_tunnel_state()
+    routes = state.get("routes", {})
+    if site_name in routes:
+        route_info = routes.pop(site_name)
+        state["routes"] = routes
+        save_tunnel_state(state)
+        # If no more cloudflare routes are active, cleanly stop the daemon
+        has_other_cf = any(r.get("provider") == "cloudflare" for r in routes.values())
+        if not has_other_cf:
+            try:
+                stop_cloudflared_tunnel()
+            except Exception:
+                pass
+        return {"disconnected": True, "site": site_name, "removed_route": route_info}
+    return {"disconnected": False, "site": site_name, "message": "No active tunnel route for this site"}
 
 
 def connect_site_to_ngrok(site_name: str, hostname: str | None = None) -> dict:
     from ngrok.manager import start_tunnel, NgrokError
     from tunnel.state import record_tunnel_route
     port = get_site_port(site_name)
+    clean_host = re.sub(r"^https?://", "", hostname.strip()).rstrip("/") if hostname else None
     try:
-        cfg = start_tunnel(f"site-{site_name}", port, hostname)
-        record_tunnel_route(tunnel_name=f"site-{site_name}", provider="ngrok", site_name=site_name, hostname=hostname or "ngrok-dynamic", port=port)
+        cfg = start_tunnel(f"site-{site_name}", port, clean_host)
+        record_tunnel_route(tunnel_name=f"site-{site_name}", provider="ngrok", site_name=site_name, hostname=clean_host or "ngrok-dynamic", port=port)
     except NgrokError as e:
         raise TunnelConnectError(str(e))
     return {"site": site_name, "port": port, "tunnel_name": cfg.tunnel_name}
+
+

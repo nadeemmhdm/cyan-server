@@ -21,11 +21,39 @@ class CreateSiteRequest(BaseModel):
 
 
 def _serialize(site) -> dict:
+    tunnel_info = {"active": False, "provider": None, "hostname": None, "tunnel_name": None}
+    try:
+        from tunnel.state import load_tunnel_state, is_cloudflared_running
+        t_state = load_tunnel_state()
+        routes = t_state.get("routes", {})
+        cf_running = is_cloudflared_running()
+        if site.name in routes:
+            r = routes[site.name]
+            provider = r.get("provider", "cloudflare")
+            is_active = cf_running if provider == "cloudflare" else True
+            tunnel_info = {
+                "active": is_active,
+                "provider": provider,
+                "hostname": r.get("hostname"),
+                "tunnel_name": r.get("tunnel_name"),
+            }
+        elif site.domain and cf_running:
+            tunnel_info = {
+                "active": True,
+                "provider": "cloudflare",
+                "hostname": site.domain,
+                "tunnel_name": t_state.get("active_tunnel", "cyan-tunnel"),
+            }
+    except Exception:
+        pass
+
     return {
         "id": site.id, "name": site.name, "site_type": site.site_type,
         "source_type": site.source_type, "source": site.source, "port": site.port,
         "domain": site.domain, "status": site.status, "pid": site.pid,
+        "tunnel": tunnel_info,
     }
+
 
 
 @router.get("")
@@ -33,12 +61,22 @@ def list_sites(_=Depends(require_auth)):
     return [_serialize(s) for s in web_manager.list_sites()]
 
 
+import re
+import json
+
+def _clean_domain(domain: str | None) -> str | None:
+    if not domain:
+        return None
+    d = re.sub(r"^https?://", "", domain.strip()).rstrip("/")
+    return d or None
+
+
 @router.post("")
 def create_site(req: CreateSiteRequest, _=Depends(require_auth)):
     try:
         site = web_manager.create_site(
             req.name, req.site_type, req.source_type, req.source,
-            req.port, req.domain, req.env_vars,
+            req.port, _clean_domain(req.domain), req.env_vars,
         )
         return _serialize(site)
     except web_manager.SiteError as e:
@@ -78,7 +116,7 @@ class SetDomainRequest(BaseModel):
 @router.post("/{name}/domain")
 def set_domain(name: str, req: SetDomainRequest, _=Depends(require_auth)):
     try:
-        return _serialize(web_manager.set_domain(name, req.domain))
+        return _serialize(web_manager.set_domain(name, _clean_domain(req.domain)))
     except web_manager.SiteError as e:
         raise HTTPException(400, str(e))
 
@@ -132,6 +170,41 @@ async def upload_site_zip(name: str, path: str = Form(""), file: UploadFile = Fi
         content = await file.read()
         extracted = web_manager.extract_site_zip(name, content, path)
         return {"success": True, "filename": file.filename, "extracted_count": len(extracted), "files": extracted}
+    except web_manager.SiteError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/{name}/files/upload-folder")
+async def upload_site_folder(
+    name: str,
+    files: list[UploadFile] = File(...),
+    paths: str = Form("[]"),
+    _=Depends(require_auth)
+):
+    """Upload multiple files preserving relative directory structure from webkitdirectory folder picker."""
+    try:
+        try:
+            rel_paths = json.loads(paths)
+        except Exception:
+            rel_paths = []
+
+        if len(rel_paths) != len(files):
+            rel_paths = [f.filename for f in files]
+
+        clean_paths = [p.replace("\\", "/").strip("/") for p in rel_paths]
+
+        # If all paths share a common top-level directory (e.g., 'dist/index.html'), strip it
+        parts_list = [p.split("/") for p in clean_paths if p]
+        if parts_list and all(len(parts) > 1 and parts[0] == parts_list[0][0] for parts in parts_list):
+            clean_paths = ["/".join(parts[1:]) for parts in parts_list]
+
+        saved = []
+        for file, rel_path in zip(files, clean_paths):
+            content = await file.read()
+            web_manager.write_site_file(name, rel_path, content)
+            saved.append(rel_path)
+
+        return {"success": True, "files_count": len(saved), "files": saved}
     except web_manager.SiteError as e:
         raise HTTPException(400, str(e))
 

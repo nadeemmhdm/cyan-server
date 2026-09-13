@@ -112,6 +112,16 @@ def _startup():
     from backup.manager import start_auto_backup_thread
     app.state.backup_stop_event = start_auto_backup_thread()
 
+    # Automatically recover active cloudflare tunnel on startup
+    try:
+        from tunnel.state import load_tunnel_state, start_cloudflared_tunnel
+        t_state = load_tunnel_state()
+        if t_state.get("provider") == "cloudflare" and t_state.get("active_tunnel"):
+            start_cloudflared_tunnel(t_state["active_tunnel"])
+    except Exception:
+        pass
+
+
 
 @app.on_event("shutdown")
 def _shutdown():

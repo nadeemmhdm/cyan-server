@@ -70,14 +70,19 @@ def render_caddyfile(sites: list[Website]) -> str:
         "}\n\n"
     )
 
+    import re
     blocks = []
     for site in sites:
         if site.status != "running":
             continue
-        host = f"http://{site.domain}, {site.domain}" if site.domain else f":{_pick_public_port(site)}"
+        if site.domain:
+            clean_dom = re.sub(r"^https?://", "", site.domain.strip()).rstrip("/")
+            host = f"http://{clean_dom}, {clean_dom}"
+        else:
+            host = f":{_pick_public_port(site)}"
         blocks.append(
             f"{host} {{\n"
-            f"    reverse_proxy localhost:{site.port} {{\n"
+            f"    reverse_proxy 127.0.0.1:{site.port} {{\n"
             f"        @custom status 403 404 500 502 503\n"
             f"        handle_response @custom {{\n"
             f'            root * "{errors_dir.as_posix()}"\n'

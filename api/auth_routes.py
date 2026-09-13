@@ -11,17 +11,30 @@ from security.rate_limit import (
 )
 from core.database import AuditLog, User, get_session
 
+from security.totp import generate_secret, verify_totp, get_otpauth_uri
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+_pending_2fa: dict[str, str] = {}
 
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+    totp_code: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+class Enable2FARequest(BaseModel):
+    code: str
+
+
+class Disable2FARequest(BaseModel):
+    password: str
 
 
 def _audit(event: str, username: str | None, source_ip: str | None, detail: str = ""):
@@ -56,6 +69,18 @@ def login(req: LoginRequest, request: Request):
         _audit("login_failed", req.username, source_ip)
         raise HTTPException(401, "Invalid username or password")
 
+    # If 2FA is enabled on this account, challenge for TOTP code
+    if getattr(user, "totp_enabled", False):
+        if not req.totp_code:
+            return {
+                "require_2fa": True,
+                "message": "Two-factor authentication code required",
+            }
+        if not verify_totp(user.totp_secret or "", req.totp_code):
+            record_failed_login(req.username)
+            _audit("login_failed_2fa", req.username, source_ip)
+            raise HTTPException(401, "Invalid two-factor authentication code")
+
     record_successful_login(req.username)
     _audit("login_success", req.username, source_ip)
     token = create_token(user)
@@ -74,7 +99,77 @@ def get_current_user_profile(payload: dict = Depends(require_admin)):
             "id": user.id,
             "username": user.username,
             "role": user.role,
+            "totp_enabled": bool(user.totp_enabled),
         }
+    finally:
+        session.close()
+
+
+@router.get("/2fa/status")
+def get_2fa_status(payload: dict = Depends(require_admin)):
+    session = get_session()
+    try:
+        user = session.query(User).filter_by(username=payload.get("sub")).first()
+        if not user:
+            raise HTTPException(404, "User not found")
+        return {"enabled": bool(user.totp_enabled)}
+    finally:
+        session.close()
+
+
+@router.post("/2fa/setup")
+def setup_2fa(payload: dict = Depends(require_admin)):
+    username = payload.get("sub")
+    secret = generate_secret()
+    _pending_2fa[username] = secret
+    uri = get_otpauth_uri(secret, username)
+    return {"secret": secret, "otpauth_url": uri}
+
+
+@router.post("/2fa/enable")
+def enable_2fa(req: Enable2FARequest, request: Request, payload: dict = Depends(require_admin)):
+    username = payload.get("sub")
+    source_ip = request.client.host if request.client else "unknown"
+    secret = _pending_2fa.get(username)
+    if not secret:
+        raise HTTPException(400, "2FA setup has not been initiated. Please click Enable 2FA again.")
+    if not verify_totp(secret, req.code):
+        _audit("2fa_enable_failed", username, source_ip, "invalid code")
+        raise HTTPException(400, "Invalid 6-digit verification code. Check your authenticator app clock.")
+
+    session = get_session()
+    try:
+        user = session.query(User).filter_by(username=username).first()
+        if not user:
+            raise HTTPException(404, "User not found")
+        user.totp_secret = secret
+        user.totp_enabled = True
+        session.commit()
+        _pending_2fa.pop(username, None)
+        _audit("2fa_enabled", username, source_ip)
+        return {"success": True, "message": "Two-factor authentication enabled successfully"}
+    finally:
+        session.close()
+
+
+@router.post("/2fa/disable")
+def disable_2fa(req: Disable2FARequest, request: Request, payload: dict = Depends(require_admin)):
+    from security.auth import verify_password
+    username = payload.get("sub")
+    source_ip = request.client.host if request.client else "unknown"
+    session = get_session()
+    try:
+        user = session.query(User).filter_by(username=username).first()
+        if not user or not verify_password(req.password, user.password_hash):
+            _audit("2fa_disable_failed", username, source_ip, "incorrect password")
+            raise HTTPException(400, "Current password is incorrect")
+
+        user.totp_enabled = False
+        user.totp_secret = None
+        session.commit()
+        _pending_2fa.pop(username, None)
+        _audit("2fa_disabled", username, source_ip)
+        return {"success": True, "message": "Two-factor authentication disabled"}
     finally:
         session.close()
 

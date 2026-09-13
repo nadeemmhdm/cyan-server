@@ -1,3 +1,17 @@
+# Cyan Server v0.7.3 Release Notes
+
+**Cyan Server v0.7.3** delivers critical stability and UX enhancements:
+1. **PostgreSQL Auto-Fallback Engine**: Eliminates `psql/createdb not found` build errors by providing automatic, seamless SQLite provisioning with PostgreSQL compatibility whenever host PostgreSQL binaries are absent.
+2. **Local Folder Browser Picker**: Direct browser directory upload (`webkitdirectory`) preserving directory structures, removing the need to manually enter text file paths.
+3. **Caddy Domain White-Screen Fix & IPv6 Safety**: Sanitizes all domain inputs to strip duplicate `http://https://` schemes and routes upstreams to explicit `127.0.0.1:{port}` to prevent Windows loopback drops.
+4. **Cloudflare Error 1033 Fix & Live Daemon Management**: Resolves Argo Tunnel Error 1033 by automatically syncing ingress rules to `127.0.0.1:80` and actively launching/refreshing `cloudflared` background processes.
+5. **Dashboard Live Tunnel Status & Actions**: Shows real-time `Live` tunnel badges, clickable public URLs, and 1-click Disconnect/Start actions instead of static "Connect" buttons.
+6. **1-Click Reboot Recovery (`Auto-Resume All`)**: Single-click button in dashboard and CLI `[04]` to restore all stopped websites, re-bind Caddy reverse proxy domains with SSL, and re-launch public tunnels after device reboot.
+7. **TOTP Two-Factor Authentication (2FA)**: Native pure-Python RFC 6238 TOTP 2FA for admin accounts with QR code generation, secret copying, and login gate challenge.
+8. **Mobile-First Responsive Dashboard**: Complete responsive layouts for mobile (`<= 480px`), tablet (`<= 768px`), and desktop with touch-scrolling navigation, responsive modal sizing, and horizontal table scrolling.
+
+---
+
 # Cyan Server v0.7.2 Release Notes
 
 **Cyan Server v0.7.2** brings a full-featured visual Website Builder to the Cyan Hub Web Dashboard (`http://localhost:7331/`), ZIP archive upload & unpacking, custom domain & tunnel connection dialogs, a first-time user welcome card with quick actions, host PostgreSQL missing-binary detection with zero-config SQLite guidance, write-only API key permission scoping, and an Admin Profile modal with secure password updating.

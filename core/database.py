@@ -39,6 +39,8 @@ class User(Base):
     username = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="admin")  # admin | user
+    totp_secret = Column(String, nullable=True)
+    totp_enabled = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utcnow)
 
 

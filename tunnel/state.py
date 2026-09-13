@@ -63,13 +63,30 @@ def is_process_running(pid: int | None) -> bool:
 
 def is_cloudflared_running() -> bool:
     import psutil
-    for p in psutil.process_iter(["name"]):
+    for p in psutil.process_iter(["name", "cmdline"]):
         try:
-            if "cloudflared" in (p.info["name"] or "").lower():
+            name = (p.info["name"] or "").lower()
+            cmdline = " ".join(p.info["cmdline"] or []).lower()
+            if "cloudflared" in name or "cloudflared" in cmdline:
                 return True
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
     return False
+
+
+def stop_cloudflared_tunnel() -> None:
+    """Terminate any running cloudflared tunnel daemon processes."""
+    import psutil
+    import time
+    for p in psutil.process_iter(["name", "cmdline"]):
+        try:
+            name = (p.info["name"] or "").lower()
+            cmdline = " ".join(p.info["cmdline"] or []).lower()
+            if "cloudflared" in name or "cloudflared" in cmdline:
+                p.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    time.sleep(0.6)
 
 
 def start_cloudflared_tunnel(tunnel_name: str) -> bool:
@@ -79,7 +96,6 @@ def start_cloudflared_tunnel(tunnel_name: str) -> bool:
 
     cloudflared_bin = shutil.which("cloudflared")
     if not cloudflared_bin:
-        # Check standard user locations
         candidates = [
             Path.home() / ".cyan-server" / "bin" / ("cloudflared.exe" if sys.platform == "win32" else "cloudflared"),
             Path("C:/Program Files/cloudflared/cloudflared.exe"),
@@ -93,9 +109,18 @@ def start_cloudflared_tunnel(tunnel_name: str) -> bool:
     if not cloudflared_bin:
         return False
 
-    cfg_file = Path.home() / ".cloudflared" / "config.yml"
+    cfg_file = None
+    for c in [
+        Path.home() / ".cloudflared" / "config.yml",
+        Path.cwd() / "tunnel_config.yml",
+        Path.home() / ".cyan-server" / "tunnel_config.yml",
+    ]:
+        if c.exists():
+            cfg_file = c
+            break
+
     args = [cloudflared_bin]
-    if cfg_file.exists():
+    if cfg_file:
         args.extend(["tunnel", "--config", str(cfg_file), "run", tunnel_name])
     else:
         args.extend(["tunnel", "run", tunnel_name])
@@ -110,7 +135,16 @@ def start_cloudflared_tunnel(tunnel_name: str) -> bool:
         stderr=subprocess.DEVNULL,
         creationflags=creationflags,
     )
-    return is_process_running(proc.pid)
+    import time
+    time.sleep(1.2)
+    return is_cloudflared_running()
+
+
+def restart_cloudflared_tunnel(tunnel_name: str) -> bool:
+    """Restart cloudflared daemon to apply updated ingress configs."""
+    stop_cloudflared_tunnel()
+    return start_cloudflared_tunnel(tunnel_name)
+
 
 
 def resume_all_services(agent_base: str = "http://localhost:7331") -> dict:
