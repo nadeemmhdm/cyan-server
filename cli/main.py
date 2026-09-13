@@ -400,7 +400,7 @@ def web_list():
 @web_app.command("create")
 def web_create(name: str, site_type: str, source_type: str, source: str,
                 port: int, domain: str = typer.Option(None)):
-    """site_type: static|node|python|docker  source_type: folder|git|docker_image"""
+    """site_type: static|node|python|php|react|docker  source_type: folder|git|docker_image"""
     result = _agent_post("/api/web", {
         "name": name, "site_type": site_type, "source_type": source_type,
         "source": source, "port": port, "domain": domain,

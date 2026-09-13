@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.6.1-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.6.2-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -22,7 +22,7 @@ Open source, Apache 2.0 licensed. Every feature below has been tested live again
 - [Auto-update](#-auto-update)
 - [Automatic recovery — one command brings everything back](#-automatic-recovery--one-command-brings-everything-back)
 - [Remote & mobile access](#-remote--mobile-access)
-- [CLI reference](#-cli-reference)
+- [CLI reference](#-cli-reference) — full command-by-command reference with examples: [docs/COMMANDS.md](docs/COMMANDS.md)
 - [Architecture](#-architecture)
 - [Platform support](#-platform-support)
 - [What's verified](#-whats-verified)
@@ -179,6 +179,9 @@ The dashboard is a single responsive page — no app to install, works in any mo
 ---
 
 ## 📟 CLI reference
+
+Full reference with a real, verified usage example for every single
+command: **[docs/COMMANDS.md](docs/COMMANDS.md)**. Quick overview:
 
 ```
 cyan start              Start the agent (API + dashboard, one process)
