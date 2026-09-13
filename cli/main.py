@@ -108,11 +108,11 @@ def _auth_headers() -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _agent_get(path: str, auth: bool = False) -> dict:
+def _agent_get(path: str, auth: bool = False, timeout: int = 30) -> dict:
     headers = _auth_headers() if auth else {}
     req = urllib.request.Request(f"{AGENT_BASE}{path}", headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8", errors="ignore"))
     except urllib.error.HTTPError as e:
         raw = e.read().decode("utf-8", errors="ignore")
@@ -330,6 +330,27 @@ def up():
             console.print(f"  {r['name']}: already running")
         else:
             console.print(f"[red]✗ {r['name']}: {r.get('error', 'failed')}[/red]")
+
+
+@app.command(name="version")
+def version_cmd():
+    """Print the current Cyan Server CLI and core version."""
+    from core.version import VERSION
+    console.print(f"[bold cyan]Cyan Server[/bold cyan] v[bold white]{VERSION}[/bold white]")
+
+
+@app.command(name="resume")
+def resume_cmd():
+    """1-Click Restore: Auto-resume all sites, domains (Caddy SSL), and tunnels after restart."""
+    console.print("[cyan]Running 1-Click Auto-Resume across all sites, domains, and tunnels...[/cyan]")
+    result = _agent_post("/api/resume", auth=False, method="POST")
+    console.print(f"[bold green]✓ Auto-Resume Completed:[/bold green] {result.get('message', 'All services active')}")
+    for item in result.get("recovered_sites", []):
+        console.print(f"  • Site: [bold white]{item.get('name')}[/bold white] -> {item.get('status')}")
+    if result.get("caddy_reloaded"):
+        console.print("  • Caddy Domains & SSL: [green]Reloaded[/green]")
+    if result.get("tunnel_started"):
+        console.print("  • Cloudflare Tunnel: [green]Active & Connected[/green]")
 
 
 @app.command()
