@@ -52,12 +52,8 @@ def _read_pidfile() -> int | None:
 
 
 def _process_alive(pid: int) -> bool:
-    import os as _os
-    try:
-        _os.kill(pid, 0)
-        return True
-    except (ProcessLookupError, PermissionError, OSError):
-        return False
+    import psutil
+    return psutil.pid_exists(pid)
 
 
 def _load_token() -> str | None:
@@ -88,10 +84,15 @@ def _agent_get(path: str, auth: bool = False) -> dict:
     req = urllib.request.Request(f"{AGENT_BASE}{path}", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            return json.loads(resp.read())
+            return json.loads(resp.read().decode("utf-8", errors="ignore"))
     except urllib.error.HTTPError as e:
-        body = json.loads(e.read())
-        console.print(f"[red]✗ {body.get('detail', str(e))}[/red]")
+        raw = e.read().decode("utf-8", errors="ignore")
+        try:
+            body = json.loads(raw)
+            detail = body.get("detail", raw)
+        except Exception:
+            detail = raw or str(e)
+        console.print(f"[red]✗ {detail}[/red]")
         raise typer.Exit(code=1)
     except (urllib.error.URLError, ConnectionRefusedError):
         console.print("[red]✗ Cannot reach Cyan Agent.[/red] "
@@ -107,10 +108,15 @@ def _agent_post(path: str, payload: dict | None = None, auth: bool = False, meth
     req = urllib.request.Request(f"{AGENT_BASE}{path}", data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read())
+            return json.loads(resp.read().decode("utf-8", errors="ignore"))
     except urllib.error.HTTPError as e:
-        body = json.loads(e.read())
-        console.print(f"[red]✗ {body.get('detail', str(e))}[/red]")
+        raw = e.read().decode("utf-8", errors="ignore")
+        try:
+            body = json.loads(raw)
+            detail = body.get("detail", raw)
+        except Exception:
+            detail = raw or str(e)
+        console.print(f"[red]✗ {detail}[/red]")
         raise typer.Exit(code=1)
     except (urllib.error.URLError, ConnectionRefusedError):
         console.print("[red]✗ Cannot reach Cyan Agent.[/red]")
@@ -183,8 +189,12 @@ def start():
         return
     agent_path = Path(__file__).resolve().parent.parent / "agent" / "main.py"
     console.print("Starting Cyan Agent...")
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
     proc = subprocess.Popen([sys.executable, str(agent_path)],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=creationflags)
     for _ in range(20):
         try:
             urllib.request.urlopen(f"{AGENT_BASE}/api/health", timeout=1)
@@ -202,12 +212,18 @@ def stop():
     if not pid or not _process_alive(pid):
         console.print("[yellow]No running agent found (pidfile missing or stale).[/yellow]")
         return
-    import signal
+    import psutil
     try:
-        os.kill(pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError, OSError) as e:
-        console.print(f"[red]✗ Could not stop agent (pid {pid}): {e}[/red]")
-        return
+        parent = psutil.Process(pid)
+        for child in parent.children(recursive=True):
+            try:
+                child.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        parent.terminate()
+        parent.wait(timeout=3)
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired, OSError) as e:
+        pass
     for _ in range(10):
         if not _process_alive(pid):
             console.print(f"[green]✓ Agent stopped (was pid {pid})[/green]")
@@ -849,6 +865,225 @@ def tunnel_url(port: int = typer.Option(None, help="Filter to a specific local p
         console.print(f"[green]{result['public_url']}[/green]")
     else:
         console.print("[yellow]No active ngrok tunnel found.[/yellow]")
+
+
+# --- Database Management -----------------------------------------------------
+
+db_app = typer.Typer(help="Manage SQL databases with Unique IDs.")
+app.add_typer(db_app, name="db")
+app.add_typer(db_app, name="database")
+
+
+@db_app.command("list")
+def db_list():
+    """List all managed databases with their Unique IDs."""
+    dbs = _agent_get("/api/database", auth=True)
+    if not dbs:
+        console.print("[yellow]No databases created yet.[/yellow] Run: [bold]cyan db create <name>[/bold]")
+        return
+    table = Table(title="Cyan Managed Databases", border_style="cyan")
+    table.add_column("Unique ID", style="bold cyan")
+    table.add_column("Name")
+    table.add_column("Engine", style="green")
+    table.add_column("Created At", style="dim")
+    for d in dbs:
+        uid = d.get("unique_id") or d["name"]
+        table.add_row(uid, d["name"], d["engine"], d["created_at"][:19])
+    console.print(table)
+
+
+@db_app.command("create")
+def db_create(name: str, engine: str = typer.Option("sqlite", help="sqlite or postgres")):
+    """Create a new database. Automatically assigns a unique ID (name_4to6digits)."""
+    res = _agent_post("/api/database", {"name": name, "engine": engine}, auth=True)
+    uid = res.get("unique_id", name)
+    console.print(f"[green]✓ Database '{name}' provisioned successfully![/green]")
+    console.print(f"  • [bold]Unique ID:[/bold]  [cyan]{uid}[/cyan]")
+    console.print(f"  • [bold]Engine:[/bold]     {res['engine']}")
+    console.print(f"  • [bold]Target DB:[/bold]   {res.get('connection_info', {}).get('path', 'live')}")
+    console.print(f"\nAccess externally via Client API: [bold]POST /api/v1/database/{uid}/query[/bold]")
+
+
+@db_app.command("info")
+def db_info(identifier: str):
+    """View schema, size, and table details for a database (by unique ID or name)."""
+    st = _agent_get(f"/api/database/{identifier}/status", auth=True)
+    table = Table(title=f"Database Info: {identifier}", border_style="cyan")
+    table.add_column("Property", style="bold")
+    table.add_column("Value")
+    table.add_row("Engine", st.get("engine", "sqlite"))
+    table.add_row("Size (bytes)", str(st.get("size_bytes", 0)))
+    table.add_row("Tables", ", ".join(st.get("tables", [])) or "(no tables yet)")
+    console.print(table)
+
+
+@db_app.command("query")
+def db_query(identifier: str, sql: str = typer.Argument(..., help="SQL query to execute")):
+    """Run an arbitrary SQL query against a database (by unique ID or name)."""
+    res = _agent_post(f"/api/database/{identifier}/query", {"sql": sql}, auth=True)
+    rows = res.get("rows", [])
+    cols = res.get("columns", [])
+    if cols:
+        table = Table(title=f"Query Results ({len(rows)} row{'s' if len(rows) != 1 else ''})", border_style="cyan")
+        for col in cols:
+            table.add_column(col)
+        for r in rows:
+            table.add_row(*[str(r.get(c, "")) for c in cols])
+        console.print(table)
+    else:
+        console.print(f"[green]✓ Query executed successfully ({res.get('row_count', 0)} rows affected)[/green]")
+
+
+@db_app.command("delete")
+def db_delete(identifier: str, permanent: bool = typer.Option(False, "--permanent", help="Permanently delete without sending to trash")):
+    """Delete a managed database (by unique ID or name)."""
+    _agent_post(f"/api/database/{identifier}", None, auth=True, method="DELETE")
+    console.print(f"[yellow]✓ Database '{identifier}' deleted{' (permanent)' if permanent else ''}.[/yellow]")
+
+
+# --- Storage Buckets ---------------------------------------------------------
+
+storage_app = typer.Typer(help="Manage Storage Buckets with Unique IDs.")
+app.add_typer(storage_app, name="storage")
+app.add_typer(storage_app, name="bucket")
+
+
+@storage_app.command("list")
+def storage_list():
+    """List all managed storage buckets with their Unique IDs."""
+    res = _agent_get("/api/storage/buckets", auth=True)
+    buckets = res.get("buckets", [])
+    if not buckets:
+        console.print("[yellow]No storage buckets yet.[/yellow] Run: [bold]cyan storage create <name>[/bold]")
+        return
+    table = Table(title="Cyan Storage Buckets", border_style="cyan")
+    table.add_column("Bucket ID", style="bold cyan")
+    table.add_column("Name")
+    table.add_column("Files", justify="right")
+    table.add_column("Size (MB)", justify="right", style="green")
+    table.add_column("Created", style="dim")
+    for b in buckets:
+        table.add_row(b["unique_id"], b["name"], str(b["file_count"]), f"{b['size_mb']:.2f}", b["created_at"][:19])
+    console.print(table)
+
+
+@storage_app.command("create")
+def storage_create(name: str, description: str = typer.Option(None, "--desc", help="Optional description")):
+    """Create a new storage bucket. Automatically assigns a unique ID (name_4to6digits)."""
+    res = _agent_post("/api/storage/buckets", {"name": name, "description": description}, auth=True)
+    uid = res.get("unique_id", name)
+    console.print(f"[green]✓ Storage bucket '{name}' created successfully![/green]")
+    console.print(f"  • [bold]Bucket ID:[/bold]    [cyan]{uid}[/cyan]")
+    console.print(f"  • [bold]Description:[/bold]  {res.get('description') or 'None'}")
+    console.print(f"\nUpload files via Client API: [bold]POST /api/v1/storage/{uid}/upload[/bold]")
+
+
+@storage_app.command("files")
+def storage_files(bucket_id: str):
+    """List all files inside a storage bucket."""
+    res = _agent_get(f"/api/storage/buckets/{bucket_id}/files", auth=True)
+    files = res.get("files", [])
+    if not files:
+        console.print(f"[yellow]Bucket '{bucket_id}' is empty.[/yellow]")
+        return
+    table = Table(title=f"Files in Bucket: {bucket_id}", border_style="cyan")
+    table.add_column("Filename", style="bold")
+    table.add_column("Size (KB)", justify="right")
+    table.add_column("Modified", style="dim")
+    for f in files:
+        table.add_row(f["name"], str(f["size_kb"]), f["modified"][:19])
+    console.print(table)
+
+
+@storage_app.command("upload")
+def storage_upload(bucket_id: str, file_path: str):
+    """Upload a file into a storage bucket."""
+    path = Path(file_path)
+    if not path.exists() or not path.is_file():
+        console.print(f"[red]✗ File '{file_path}' does not exist.[/red]")
+        raise typer.Exit(code=1)
+
+    import secrets
+    import mimetypes
+    boundary = "----CyanUpload" + secrets.token_hex(16)
+    filename = path.name
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    file_bytes = path.read_bytes()
+
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n"
+    ).encode() + file_bytes + f"\r\n--{boundary}--\r\n".encode()
+
+    headers = _auth_headers()
+    headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
+
+    req = urllib.request.Request(f"{AGENT_BASE}/api/storage/buckets/{bucket_id}/upload", data=body, method="POST", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            console.print(f"[green]✓ Uploaded '{filename}' ({len(file_bytes)} bytes) to bucket '{bucket_id}'[/green]")
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        console.print(f"[red]✗ Upload failed: {err}[/red]")
+        raise typer.Exit(code=1)
+
+
+@storage_app.command("delete")
+def storage_delete(bucket_id: str, permanent: bool = typer.Option(False, "--permanent")):
+    """Delete a storage bucket."""
+    _agent_post(f"/api/storage/buckets/{bucket_id}", None, auth=True, method="DELETE")
+    console.print(f"[yellow]✓ Storage bucket '{bucket_id}' deleted{' (permanent)' if permanent else ''}.[/yellow]")
+
+
+# --- API Key Management ------------------------------------------------------
+
+key_app = typer.Typer(help="Manage universal API keys for external database & storage access.")
+app.add_typer(key_app, name="key")
+app.add_typer(key_app, name="apikey")
+
+
+@key_app.command("list")
+def key_list():
+    """List all active API keys."""
+    keys = _agent_get("/api/keys", auth=True)
+    if not keys:
+        console.print("[yellow]No API keys generated yet.[/yellow] Run: [bold]cyan key create <name>[/bold]")
+        return
+    table = Table(title="Cyan Universal API Keys", border_style="cyan")
+    table.add_column("ID", style="dim", justify="right")
+    table.add_column("Name", style="bold")
+    table.add_column("API Key Token", style="cyan")
+    table.add_column("Permissions", style="green")
+    table.add_column("Last Used", style="dim")
+    for k in keys:
+        # Mask middle of key for security in terminal
+        raw = k["key"]
+        masked = raw[:14] + "..." + raw[-6:] if len(raw) > 20 else raw
+        table.add_row(str(k["id"]), k["name"], masked, k["permissions"], (k["last_used_at"] or "Never")[:19])
+    console.print(table)
+
+
+@key_app.command("create")
+def key_create(name: str, permissions: str = typer.Option("full", help="full|read|write")):
+    """Generate a new universal API key."""
+    res = _agent_post("/api/keys", {"name": name, "permissions": permissions}, auth=True)
+    token = res["key"]
+    console.print(f"[green]✓ Universal API Key generated successfully![/green]")
+    console.print(f"  • [bold]Key Name:[/bold]     {res['name']}")
+    console.print(f"  • [bold]Permissions:[/bold]  {res['permissions']}")
+    console.print(f"  • [bold]API Key:[/bold]      [bold cyan]{token}[/bold cyan]")
+    console.print(f"\n[yellow]Store this key securely! You can use this single key to access:[/yellow]")
+    console.print(f"  1. Databases:       [bold]curl -H 'X-API-Key: {token}' http://localhost:7331/api/v1/database/<db_id>/query[/bold]")
+    console.print(f"  2. Storage Buckets: [bold]curl -H 'X-API-Key: {token}' http://localhost:7331/api/v1/storage/<bucket_id>/files[/bold]")
+
+
+@key_app.command("revoke")
+def key_revoke(identifier: str):
+    """Revoke an API key (by ID, token, or name)."""
+    res = _agent_post(f"/api/keys/{identifier}", None, auth=True, method="DELETE")
+    console.print(f"[yellow]✓ {res.get('message', 'API key revoked')}[/yellow]")
 
 
 if __name__ == "__main__":

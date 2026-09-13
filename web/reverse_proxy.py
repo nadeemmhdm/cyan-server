@@ -49,30 +49,53 @@ def caddy_binary() -> str:
     return path
 
 
+def _errors_dir() -> Path:
+    return Path(__file__).resolve().parent / "templates" / "errors"
+
+
 def render_caddyfile(sites: list[Website]) -> str:
     """Build a Caddyfile from live DB rows. No manual editing needed."""
     data_dir = _data_dir()
+    errors_dir = _errors_dir()
 
-    # Global options block must come first, before any site block, and
-    # applies to the whole Caddy instance. skip_install_trust stops Caddy
-    # from trying to install a local root CA into the OS trust store for
-    # internal/.local hostnames — on Windows that triggers a blocking
-    # "Do you want to install this certificate?" modal dialog, which hangs
-    # any automated or headless run indefinitely. Caught via real Windows
-    # testing (a `caddy reload` call timing out after 15s waiting on a
-    # dialog no one was there to click).
-    global_opts = "{\n    skip_install_trust\n}\n\n"
+    # Global options block must come first, before any site block.
+    # skip_install_trust stops Caddy from trying to install a local root CA
+    # into the OS trust store on Windows. auto_https disable_redirects allows
+    # Caddy to listen on HTTP (port 80) behind Cloudflare Tunnel without
+    # forcing an infinite redirect loop.
+    global_opts = (
+        "{\n"
+        "    skip_install_trust\n"
+        "    auto_https disable_redirects\n"
+        "}\n\n"
+    )
 
     blocks = []
     for site in sites:
         if site.status != "running":
             continue
-        host = site.domain if site.domain else f":{_pick_public_port(site)}"
+        host = f"http://{site.domain}, {site.domain}" if site.domain else f":{_pick_public_port(site)}"
         blocks.append(
             f"{host} {{\n"
-            f"    reverse_proxy localhost:{site.port}\n"
+            f"    reverse_proxy localhost:{site.port} {{\n"
+            f"        @custom status 403 404 500 502 503\n"
+            f"        handle_response @custom {{\n"
+            f'            root * "{errors_dir.as_posix()}"\n'
+            f"            try_files /{{rp.status_code}}.html /error.html\n"
+            f"            file_server {{\n"
+            f"                status {{rp.status_code}}\n"
+            f"            }}\n"
+            f"        }}\n"
+            f"    }}\n"
+            f"    handle_errors {{\n"
+            f'        root * "{errors_dir.as_posix()}"\n'
+            f"        try_files /{{err.status_code}}.html /error.html\n"
+            f"        file_server {{\n"
+            f"            status {{err.status_code}}\n"
+            f"        }}\n"
+            f"    }}\n"
             f"    log {{\n"
-            f"        output file {data_dir}/logs/{site.name}.log\n"
+            f'        output file "{data_dir.as_posix()}/logs/{site.name}.log"\n'
             f"    }}\n"
             f"}}\n"
         )

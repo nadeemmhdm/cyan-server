@@ -1,310 +1,1514 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Cyan Server Dashboard</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  :root {
-    --bg: #0b0f14; --panel: #121821; --border: #232c38; --text: #e6edf3;
-    --muted: #8b98a5; --accent: #22d3ee; --accent2: #34d399; --warn: #f59e0b; --danger: #f87171;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text);
-  }
-  header {
-    padding: 20px 28px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
-  header h1 span { color: var(--accent); }
-  #agent-status { font-size: 13px; color: var(--muted); }
-  #agent-status.ok { color: var(--accent2); }
-  #agent-status.down { color: var(--danger); }
-  main { padding: 28px; max-width: 1100px; margin: 0 auto; }
-  @media (max-width: 480px) {
-    header { padding: 14px 16px; }
-    main { padding: 14px; }
-    .metric { font-size: 22px; }
-    #login-card > div { flex-direction: column; align-items: stretch !important; }
-    #login-card input, #login-card button { width: 100%; }
-    table { font-size: 12px; }
-  }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-  .card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 18px 20px;
-  }
-  .card h3 { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .metric { font-size: 28px; font-weight: 600; }
-  .metric small { font-size: 14px; color: var(--muted); font-weight: 400; }
-  .bar-bg { background: #1c2531; border-radius: 6px; height: 8px; margin-top: 10px; overflow: hidden; }
-  .bar-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  td, th { padding: 6px 4px; text-align: left; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 500; }
-  .section-title { margin: 32px 0 12px; font-size: 15px; color: var(--muted); }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
-  .badge.yes { background: rgba(52,211,153,0.15); color: var(--accent2); }
-  .badge.no { background: rgba(248,113,113,0.15); color: var(--danger); }
-  .placeholder { color: var(--muted); font-size: 13px; padding: 16px; border: 1px dashed var(--border); border-radius: 10px; }
-</style>
+  <meta charset="UTF-8">
+  <title>Cyan Server — Cloud & Server Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a0f;
+      --bg-gradient: radial-gradient(circle at 15% 15%, rgba(34, 211, 238, 0.08) 0%, transparent 40%),
+                     radial-gradient(circle at 85% 85%, rgba(52, 211, 153, 0.05) 0%, transparent 40%),
+                     #070a0f;
+      --panel: rgba(15, 23, 36, 0.75);
+      --panel-hover: rgba(22, 33, 51, 0.85);
+      --panel-solid: #0f172a;
+      --border: rgba(35, 52, 77, 0.7);
+      --border-accent: rgba(34, 211, 238, 0.4);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #22d3ee;
+      --accent-glow: rgba(34, 211, 238, 0.25);
+      --accent2: #34d399;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* HEADER */
+    header {
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      background: rgba(7, 10, 15, 0.8);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 22px;
+      box-shadow: 0 0 15px var(--accent-glow);
+    }
+    .brand h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+    .brand h1 span { color: var(--accent); }
+    .version-tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
+      border-radius: 6px;
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .status-dot.online {
+      background: var(--accent2);
+      box-shadow: 0 0 8px var(--accent2);
+      animation: pulse 2s infinite;
+    }
+    .status-dot.offline { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel-solid);
+      border: 1px solid var(--border);
+      padding: 5px 12px 5px 6px;
+      border-radius: 30px;
+      font-size: 13px;
+    }
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      color: #030712;
+      font-weight: 700;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-logout {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .btn-logout:hover { color: var(--danger); background: rgba(248, 113, 113, 0.12); }
+
+    /* NAVIGATION TABS */
+    .tabs-nav {
+      max-width: 1280px;
+      margin: 20px auto 0;
+      padding: 0 28px;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 12px 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tab-btn i { font-size: 18px; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* MAIN CONTAINER */
+    main {
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 28px 60px;
+      flex: 1;
+    }
+
+    /* TAB CONTENT */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* CARDS & GRIDS */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-bottom: 24px; }
+    .card {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .card:hover { border-color: var(--border-accent); }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .metric-val { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+    .metric-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .bar-bg {
+      background: rgba(30, 41, 59, 0.6);
+      border-radius: 999px;
+      height: 8px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.4s ease;
+    }
+
+    /* SECTION ACTIONS BAR */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .section-heading {
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-heading i { color: var(--accent); font-size: 22px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #06b6d4, #2563eb);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 6px 20px rgba(6, 182, 212, 0.45);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: rgba(30, 41, 59, 0.7);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: rgba(51, 65, 85, 0.8);
+      border-color: var(--border-accent);
+    }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+
+    /* TABLES */
+    .table-container {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+    th {
+      background: rgba(15, 23, 42, 0.5);
+      padding: 14px 18px;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(35, 52, 77, 0.4);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.015); }
+
+    .unique-id-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      background: rgba(34, 211, 238, 0.1);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      padding: 3px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-ok { background: rgba(52, 211, 153, 0.15); color: var(--accent2); border: 1px solid rgba(52, 211, 153, 0.3); }
+    .badge-warn { background: rgba(251, 191, 36, 0.15); color: var(--warn); border: 1px solid rgba(251, 191, 36, 0.3); }
+    .badge-danger { background: rgba(248, 113, 113, 0.15); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); }
+
+    /* MODALS */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.82);
+      backdrop-filter: blur(10px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.active { display: flex; animation: modalFade 0.2s ease-out; }
+    @keyframes modalFade { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+    .modal {
+      background: #0d1421;
+      border: 1px solid var(--border-accent);
+      border-radius: 18px;
+      width: 100%;
+      max-width: 520px;
+      padding: 28px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6), 0 0 35px rgba(34, 211, 238, 0.15);
+      position: relative;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .btn-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .btn-close:hover { color: var(--text); }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .id-preview-box {
+      background: rgba(34, 211, 238, 0.05);
+      border: 1px dashed rgba(34, 211, 238, 0.3);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .id-preview-box span { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+    /* CODE BLOCKS */
+    .code-box {
+      background: #06090f;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      overflow-x: auto;
+      margin-top: 10px;
+      position: relative;
+    }
+    .btn-copy {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn-copy:hover { color: var(--text); background: rgba(51, 65, 85, 0.9); }
+
+    /* LOGIN OVERLAY GATE */
+    #login-gate {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 14, 0.95);
+      backdrop-filter: blur(20px);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-box {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-accent);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 50px rgba(34, 211, 238, 0.15);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 440px;
+      padding: 36px 32px;
+      text-align: center;
+    }
+    .login-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #06b6d4, #2563eb);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 32px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.4);
+    }
+    .login-title { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.02em; }
+    .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 26px; }
+    .input-with-icon {
+      position: relative;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .input-with-icon i.prefix-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 18px;
+    }
+    .input-with-icon input {
+      width: 100%;
+      padding: 12px 14px 12px 42px;
+      background: rgba(9, 14, 26, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .input-with-icon input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.2);
+    }
+    .btn-eye {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #06b6d4, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .login-btn:hover {
+      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.5);
+      transform: translateY(-1px);
+    }
+    .login-status {
+      margin-top: 14px;
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state i { font-size: 48px; color: rgba(148, 163, 184, 0.3); margin-bottom: 12px; display: block; }
+
+    /* SQL QUERY RUNNER */
+    .query-box {
+      margin-top: 24px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+    .query-textarea {
+      width: 100%;
+      height: 90px;
+      background: #070c14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+    }
+    .query-textarea:focus { border-color: var(--accent); }
+
+    /* TEMPLATE CARDS */
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .template-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 12px;
+    }
+    .template-card.selected, .template-card:hover {
+      border-color: var(--accent);
+      background: rgba(34, 211, 238, 0.08);
+    }
+    .template-card strong { display: block; font-size: 13px; margin-bottom: 2px; color: var(--text); }
+  </style>
 </head>
 <body>
-<header>
-  <h1>Cyan<span>Server</span></h1>
-  <div id="agent-status">connecting…</div>
-</header>
 
-<main>
-  <div class="grid" id="live-grid">
-    <div class="card"><h3>CPU</h3><div class="metric" id="cpu-metric">–</div><div class="bar-bg"><div class="bar-fill" id="cpu-bar" style="width:0%"></div></div></div>
-    <div class="card"><h3>RAM</h3><div class="metric" id="ram-metric">–</div><div class="bar-bg"><div class="bar-fill" id="ram-bar" style="width:0%"></div></div></div>
-    <div class="card"><h3>Agent Uptime</h3><div class="metric" id="uptime-metric">–</div></div>
-    <div class="card"><h3>Resource Profile</h3><div class="metric" id="profile-metric">–</div></div>
-  </div>
+  <!-- LOGIN GATE -->
+  <div id="login-gate">
+    <div class="login-box">
+      <div class="login-icon"><i class='bx bxs-server'></i></div>
+      <h2 class="login-title">Cyan Server</h2>
+      <p class="login-sub">Sign in to manage your local cloud hub & APIs</p>
 
-  <div class="section-title">System</div>
-  <div class="card">
-    <table id="system-table"><tbody></tbody></table>
-  </div>
-
-  <div class="section-title">Disks</div>
-  <div class="card">
-    <table id="disk-table">
-      <thead><tr><th>Mount</th><th>Device</th><th>Type</th><th>Used</th><th>Free</th><th>Total</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <div class="section-title">Network</div>
-  <div class="card">
-    <table id="net-table">
-      <thead><tr><th>Interface</th><th>Address</th><th>Up</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <div style="margin-top:12px;font-size:13px;color:var(--muted)">Listening ports: <span id="ports-list">–</span></div>
-  </div>
-
-  <div class="section-title">Websites</div>
-  <div class="card" id="websites-card">
-    <table id="sites-table">
-      <thead><tr><th>Name</th><th>Type</th><th>Port</th><th>Domain</th><th>Status</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <div id="sites-empty" class="placeholder" style="display:none;margin-top:12px">
-      No sites yet. Create one with <code>cyan web create</code>.
+      <form id="login-form" onsubmit="event.preventDefault(); handleLogin();">
+        <div class="input-with-icon">
+          <i class='bx bx-user prefix-icon'></i>
+          <input type="text" id="input-username" placeholder="Username" value="admin" required autocomplete="username">
+        </div>
+        <div class="input-with-icon">
+          <i class='bx bx-lock-alt prefix-icon'></i>
+          <input type="password" id="input-password" placeholder="Password" required autocomplete="current-password">
+          <button type="button" class="btn-eye" onclick="togglePasswordVisibility()"><i class='bx bx-show' id="eye-icon"></i></button>
+        </div>
+        <button type="submit" class="login-btn" id="btn-submit-login">
+          <i class='bx bx-log-in-circle'></i> Sign In
+        </button>
+        <div id="login-status-msg" class="login-status"></div>
+      </form>
     </div>
   </div>
 
-  <div class="section-title">Storage</div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span id="storage-usage" style="color:var(--muted);font-size:13px">–</span>
+  <!-- HEADER -->
+  <header>
+    <a href="#" class="brand">
+      <div class="brand-icon"><i class='bx bxs-cloud'></i></div>
+      <div>
+        <h1>Cyan<span>Server</span></h1>
+      </div>
+      <span class="version-tag">v0.7.0</span>
+    </a>
+
+    <div class="header-right">
+      <div class="status-pill">
+        <span class="status-dot online" id="header-status-dot"></span>
+        <span id="header-status-text">Live</span>
+      </div>
+
+      <div class="user-pill" id="header-user-badge">
+        <div class="user-avatar" id="avatar-initials">AD</div>
+        <span id="header-username" style="font-weight:600">admin</span>
+        <button class="btn-logout" title="Log Out" onclick="handleLogout()"><i class='bx bx-log-out'></i></button>
+      </div>
     </div>
-    <table id="storage-table">
-      <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</th></tr></thead>
-      <tbody></tbody>
-    </table>
+  </header>
+
+  <!-- NAVIGATION TABS -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" onclick="switchTab('overview')"><i class='bx bx-line-chart'></i> System Overview</button>
+    <button class="tab-btn" onclick="switchTab('databases')"><i class='bx bx-data'></i> Databases</button>
+    <button class="tab-btn" onclick="switchTab('storage')"><i class='bx bx-folder'></i> Storage Buckets</button>
+    <button class="tab-btn" onclick="switchTab('apikeys')"><i class='bx bx-key'></i> API Keys</button>
+    <button class="tab-btn" onclick="switchTab('websites')"><i class='bx bx-globe'></i> Websites & Apps</button>
+  </nav>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- 1. OVERVIEW TAB -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><i class='bx bx-chip'></i> CPU Usage</span>
+            <i class='bx bx-pulse' style="color:var(--accent)"></i>
+          </div>
+          <div class="metric-val" id="metric-cpu">–</div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-cpu" style="width:0%"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><i class='bx bx-memory-card'></i> Memory (RAM)</span>
+            <i class='bx bx-pie-chart-alt-2' style="color:var(--accent2)"></i>
+          </div>
+          <div class="metric-val" id="metric-ram">–</div>
+          <div class="metric-sub" id="metric-ram-sub">–</div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-ram" style="width:0%"></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title"><i class='bx bx-time'></i> Agent Uptime</span>
+            <i class='bx bx-check-shield' style="color:var(--accent2)"></i>
+          </div>
+          <div class="metric-val" id="metric-uptime">–</div>
+          <div class="metric-sub" id="metric-profile">Resource Profile: Detecting…</div>
+        </div>
+      </div>
+
+      <div class="action-bar" style="margin-top:14px">
+        <h3 class="section-heading"><i class='bx bx-hard-drive'></i> Storage Disks</h3>
+      </div>
+      <div class="table-container" style="margin-bottom:28px">
+        <table id="table-disks">
+          <thead>
+            <tr><th>Mount</th><th>Device</th><th>Filesystem</th><th>Used</th><th>Free</th><th>Total</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="action-bar">
+        <h3 class="section-heading"><i class='bx bx-network-chart'></i> Network Interfaces</h3>
+      </div>
+      <div class="table-container">
+        <table id="table-network">
+          <thead>
+            <tr><th>Interface</th><th>IP Address</th><th>Status</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 2. DATABASES TAB -->
+    <div id="tab-databases" class="tab-content">
+      <div class="action-bar">
+        <div>
+          <h3 class="section-heading"><i class='bx bx-data'></i> Managed Databases</h3>
+          <p style="font-size:13px; color:var(--muted); margin-top:2px">Every database receives an automatic Unique ID (e.g. <code>db_48102</code>) accessible via universal API key.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-db')"><i class='bx bx-plus-circle'></i> New Database</button>
+      </div>
+
+      <div class="table-container">
+        <table id="table-databases">
+          <thead>
+            <tr><th>Unique ID</th><th>Display Name</th><th>Engine</th><th>Tables / Status</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="tbody-databases"></tbody>
+        </table>
+      </div>
+
+      <!-- Live Query Runner -->
+      <div class="query-box">
+        <div class="action-bar">
+          <h4 style="font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px">
+            <i class='bx bx-terminal' style="color:var(--accent)"></i> Interactive SQL Query Runner
+          </h4>
+          <div style="display:flex; align-items:center; gap:10px">
+            <label style="font-size:12px; color:var(--muted)">Target Database:</label>
+            <select id="select-query-db" class="form-input" style="width:auto; padding:6px 12px; font-size:13px"></select>
+          </div>
+        </div>
+        <textarea id="input-query-sql" class="query-textarea" placeholder="SELECT name FROM sqlite_master WHERE type='table';">SELECT * FROM sqlite_master;</textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px">
+          <span id="query-status-msg" style="font-size:12px; color:var(--muted)"></span>
+          <button class="btn btn-primary" onclick="executeQuery()"><i class='bx bx-play'></i> Execute Query</button>
+        </div>
+        <div id="query-results-container" style="margin-top:14px; display:none">
+          <div class="table-container" style="max-height:300px; overflow-y:auto">
+            <table id="table-query-results"></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. STORAGE BUCKETS TAB -->
+    <div id="tab-storage" class="tab-content">
+      <div class="action-bar">
+        <div>
+          <h3 class="section-heading"><i class='bx bx-cabinet'></i> Storage Buckets</h3>
+          <p style="font-size:13px; color:var(--muted); margin-top:2px">Isolated storage vaults with Unique IDs (e.g. <code>media_72910</code>) accessible via REST APIs.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-bucket')"><i class='bx bx-folder-plus'></i> New Bucket</button>
+      </div>
+
+      <div class="table-container" style="margin-bottom:28px">
+        <table id="table-buckets">
+          <thead>
+            <tr><th>Bucket ID</th><th>Name</th><th>Description</th><th>Files</th><th>Size (MB)</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="tbody-buckets"></tbody>
+        </table>
+      </div>
+
+      <!-- Bucket File Explorer -->
+      <div id="bucket-explorer" class="card" style="display:none">
+        <div class="action-bar" style="margin-bottom:14px">
+          <h4 style="font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px">
+            <i class='bx bx-folder-open' style="color:var(--accent2)"></i> Bucket Files: <span id="active-bucket-title" class="unique-id-tag"></span>
+          </h4>
+          <div style="display:flex; gap:10px">
+            <input type="file" id="bucket-file-input" style="display:none" onchange="handleFileUpload(event)">
+            <button class="btn btn-primary" onclick="document.getElementById('bucket-file-input').click()"><i class='bx bx-upload'></i> Upload File</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table id="table-bucket-files">
+            <thead>
+              <tr><th>Filename</th><th>Size</th><th>Modified</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="tbody-bucket-files"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. API KEYS TAB -->
+    <div id="tab-apikeys" class="tab-content">
+      <div class="action-bar">
+        <div>
+          <h3 class="section-heading"><i class='bx bx-key'></i> Universal API Keys</h3>
+          <p style="font-size:13px; color:var(--muted); margin-top:2px">Use one API key with your Database ID or Bucket ID to read, query, and upload from any external website.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-key')"><i class='bx bx-plus-circle'></i> Generate API Key</button>
+      </div>
+
+      <div class="table-container" style="margin-bottom:28px">
+        <table id="table-keys">
+          <thead>
+            <tr><th>ID</th><th>Key Label</th><th>API Token</th><th>Permissions</th><th>Last Used</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="tbody-keys"></tbody>
+        </table>
+      </div>
+
+      <!-- Developer Integration Examples -->
+      <div class="card">
+        <h4 style="font-size:15px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px">
+          <i class='bx bx-code-alt' style="color:var(--accent)"></i> Developer Integration Quickstart
+        </h4>
+        <p style="font-size:13px; color:var(--muted)">Use your API Key in the <code>X-API-Key</code> header to query databases and interact with storage buckets from JavaScript, Python, or cURL:</p>
+
+        <div style="margin-top:14px">
+          <span style="font-size:12px; font-weight:600; color:var(--accent2)">1. Query Database by Unique ID</span>
+          <div class="code-box">
+            <button class="btn-copy" onclick="copyCode(this)">Copy</button>
+curl -X POST http://localhost:7331/api/v1/database/&lt;YOUR_DB_ID&gt;/query \
+  -H "X-API-Key: &lt;YOUR_API_KEY&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT * FROM leads LIMIT 10;"}'
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <span style="font-size:12px; font-weight:600; color:var(--accent2)">2. Upload File to Storage Bucket by Unique ID</span>
+          <div class="code-box">
+            <button class="btn-copy" onclick="copyCode(this)">Copy</button>
+curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload \
+  -H "X-API-Key: &lt;YOUR_API_KEY&gt;" \
+  -F "file=@document.pdf"
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. WEBSITES TAB -->
+    <div id="tab-websites" class="tab-content">
+      <div class="action-bar">
+        <div>
+          <h3 class="section-heading"><i class='bx bx-globe'></i> Hosted Websites</h3>
+          <p style="font-size:13px; color:var(--muted); margin-top:2px">Manage running sites, Caddy domains, and public access.</p>
+        </div>
+      </div>
+
+      <div class="table-container" style="margin-bottom:28px">
+        <table id="table-websites">
+          <thead>
+            <tr><th>Name</th><th>Type</th><th>Port</th><th>Domain</th><th>Status</th><th>Link</th></tr>
+          </thead>
+          <tbody id="tbody-websites"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class='bx bx-radar'></i> Cloudflare & ngrok Tunnels</span>
+          <span id="badge-cf-status" class="badge badge-ok">Checking</span>
+        </div>
+        <p id="cf-details" style="font-size:13px; color:var(--muted)">Checking tunnel connections…</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODALS -->
+
+  <!-- 1. Create Database Modal -->
+  <div class="modal-overlay" id="modal-create-db">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-data' style="color:var(--accent)"></i> Provision Database</h3>
+        <button class="btn-close" onclick="closeModal('modal-create-db')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); handleCreateDatabase();">
+        <div class="form-group">
+          <label class="form-label">Database Name</label>
+          <input type="text" id="db-input-name" class="form-input" placeholder="e.g. ecommerce" required oninput="updateDbIdPreview()">
+          <div class="id-preview-box">Generated Unique ID: <span id="preview-db-id">ecommerce_...</span></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Engine</label>
+          <select id="db-input-engine" class="form-input">
+            <option value="sqlite">SQLite (Always available, zero-config)</option>
+            <option value="postgres">PostgreSQL (Host managed)</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-db')">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class='bx bx-check'></i> Create Database</button>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <div class="section-title">Applications</div>
-  <div class="card">
-    <table id="apps-table">
-      <thead><tr><th>Name</th><th>Type</th><th>Status</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <div id="apps-empty" class="placeholder" style="display:none;margin-top:12px">
-      No applications installed. Use <code>cyan apps install &lt;manifest.yaml&gt;</code>.
+  <!-- 2. Create Bucket Modal -->
+  <div class="modal-overlay" id="modal-create-bucket">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-folder-plus' style="color:var(--accent2)"></i> New Storage Bucket</h3>
+        <button class="btn-close" onclick="closeModal('modal-create-bucket')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); handleCreateBucket();">
+        <div class="form-group">
+          <label class="form-label">Bucket Name</label>
+          <input type="text" id="bucket-input-name" class="form-input" placeholder="e.g. media_assets" required oninput="updateBucketIdPreview()">
+          <div class="id-preview-box">Generated Bucket ID: <span id="preview-bucket-id">media_assets_...</span></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description (Optional)</label>
+          <input type="text" id="bucket-input-desc" class="form-input" placeholder="e.g. Production images and documents">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-bucket')">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class='bx bx-check'></i> Create Bucket</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <div class="section-title">Cloudflare Tunnel</div>
-  <div class="card" id="cloudflare-card">
-    <div id="cf-status" style="font-size:13px;color:var(--muted)">checking…</div>
+  <!-- 3. Create API Key Modal -->
+  <div class="modal-overlay" id="modal-create-key">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-key' style="color:var(--accent)"></i> Generate API Key</h3>
+        <button class="btn-close" onclick="closeModal('modal-create-key')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); handleCreateApiKey();">
+        <div class="form-group">
+          <label class="form-label">Key Label / Name</label>
+          <input type="text" id="key-input-name" class="form-input" placeholder="e.g. Production App Key" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Permissions</label>
+          <select id="key-input-perm" class="form-input">
+            <option value="full">Full Access (Databases & Storage Buckets)</option>
+            <option value="read">Read Only</option>
+          </select>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-key')">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class='bx bx-key'></i> Generate Key</button>
+        </div>
+      </form>
+    </div>
   </div>
 
-  <div class="section-title" style="margin-top:32px">Login</div>
-  <div class="card" id="login-card">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <input id="login-user" placeholder="username" value="admin"
-             style="background:#0f1520;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px">
-      <input id="login-pass" placeholder="password" type="password"
-             style="background:#0f1520;border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px">
-      <button id="login-btn" style="background:var(--accent);border:none;color:#031017;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer">Log in</button>
-      <span id="login-status" style="font-size:13px;color:var(--muted)"></span>
-    </div>
-    <div class="placeholder" style="margin-top:12px">
-      The dashboard needs a login to manage Websites/Storage/Apps (matches the agent's auth — the
-      same account <code>cyan login</code> uses). System metrics above are shown either way.
-    </div>
-  </div>
-</main>
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    const AGENT = "http://" + (location.hostname || "localhost") + ":7331";
+    let AUTH_TOKEN = localStorage.getItem("cyan_jwt_token");
+    let CURRENT_USER = localStorage.getItem("cyan_user") || "admin";
+    let activeBucketId = null;
 
-<script>
-const AGENT = "http://" + (location.hostname || "localhost") + ":7331";
-let AUTH_TOKEN = null;  // kept in memory for this page load only; re-login after refresh
-
-async function poll() {
-  const statusEl = document.getElementById("agent-status");
-  try {
-    const health = await fetch(AGENT + "/api/health").then(r => r.json());
-    statusEl.textContent = "agent online";
-    statusEl.className = "ok";
-    document.getElementById("uptime-metric").innerHTML =
-      Math.round(health.uptime_seconds) + "s";
-
-    const live = await fetch(AGENT + "/api/system/live").then(r => r.json());
-    document.getElementById("cpu-metric").innerHTML = live.cpu_percent.toFixed(1) + "<small> %</small>";
-    document.getElementById("cpu-bar").style.width = live.cpu_percent + "%";
-    document.getElementById("ram-metric").innerHTML =
-      live.ram_used_gb.toFixed(1) + " / " + live.ram_total_gb.toFixed(1) + "<small> GB</small>";
-    document.getElementById("ram-bar").style.width = live.ram_percent + "%";
-
-    const ports = await fetch(AGENT + "/api/network/ports").then(r => r.json());
-    document.getElementById("ports-list").textContent = ports.open_ports.join(", ") || "none";
-  } catch (e) {
-    statusEl.textContent = "agent unreachable — run: cyan start";
-    statusEl.className = "down";
-  }
-}
-
-async function loadSystem() {
-  try {
-    const sys = await fetch(AGENT + "/api/system").then(r => r.json());
-    document.getElementById("profile-metric").textContent = sys.resource_profile;
-
-    const rows = [
-      ["Hostname", sys.hostname],
-      ["OS", sys.os_name + " — " + sys.os_version],
-      ["Architecture", sys.architecture],
-      ["CPU", sys.cpu_model + " (" + sys.cpu_cores_physical + "P / " + sys.cpu_cores_logical + "L)"],
-      ["Primary IP", sys.primary_ip || "unknown"],
-      ["Docker", sys.docker_available
-          ? '<span class="badge yes">available (' + sys.docker_version + ')</span>'
-          : '<span class="badge no">not found</span>'],
-      ["Virtualization", sys.virtualization || "none detected"],
-    ];
-    const tbody = document.querySelector("#system-table tbody");
-    tbody.innerHTML = rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("");
-
-    const diskBody = document.querySelector("#disk-table tbody");
-    diskBody.innerHTML = sys.disks.map(d =>
-      `<tr><td>${d.mountpoint}</td><td>${d.device}</td><td>${d.fstype}</td>
-       <td>${d.used_gb} GB</td><td>${d.free_gb} GB</td><td>${d.total_gb} GB</td></tr>`
-    ).join("");
-
-    const netBody = document.querySelector("#net-table tbody");
-    netBody.innerHTML = sys.network_interfaces.map(n =>
-      `<tr><td>${n.name}</td><td>${n.address || "–"}</td>
-       <td>${n.is_up ? '<span class="badge yes">up</span>' : '<span class="badge no">down</span>'}</td></tr>`
-    ).join("");
-  } catch (e) { /* agent offline; poll() already surfaces this */ }
-}
-
-poll();
-loadSystem();
-setInterval(poll, 3000);
-setInterval(loadSystem, 15000);
-
-function authHeaders() {
-  return AUTH_TOKEN ? { "Authorization": "Bearer " + AUTH_TOKEN } : {};
-}
-
-document.getElementById("login-btn").addEventListener("click", async () => {
-  const user = document.getElementById("login-user").value;
-  const pass = document.getElementById("login-pass").value;
-  const statusEl = document.getElementById("login-status");
-  try {
-    const res = await fetch(AGENT + "/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: user, password: pass }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      statusEl.textContent = body.detail || "Login failed";
-      statusEl.style.color = "var(--danger)";
-      return;
+    function authHeaders() {
+      return AUTH_TOKEN ? { "Authorization": "Bearer " + AUTH_TOKEN } : {};
     }
-    const data = await res.json();
-    AUTH_TOKEN = data.access_token;
-    statusEl.textContent = "logged in as " + user;
-    statusEl.style.color = "var(--accent2)";
-    loadWebsites();
-    loadStorage();
-    loadApps();
-    loadCloudflare();
-  } catch (e) {
-    statusEl.textContent = "agent unreachable";
-    statusEl.style.color = "var(--danger)";
-  }
-});
 
-async function loadWebsites() {
-  if (!AUTH_TOKEN) return;
-  try {
-    const sites = await fetch(AGENT + "/api/web", { headers: authHeaders() }).then(r => r.json());
-    const tbody = document.querySelector("#sites-table tbody");
-    document.getElementById("sites-empty").style.display = sites.length ? "none" : "block";
-    tbody.innerHTML = sites.map(s => `
-      <tr>
-        <td>${s.name}</td><td>${s.site_type}</td><td>${s.port}</td>
-        <td>${s.domain || "-"}</td>
-        <td>${s.status === "running" ? '<span class="badge yes">running</span>' : '<span class="badge no">stopped</span>'}</td>
-        <td><a href="http://${location.hostname}:${s.port}" target="_blank" style="color:var(--accent)">open</a></td>
-      </tr>`).join("");
-  } catch (e) { /* not logged in or agent offline */ }
-}
-
-async function loadStorage() {
-  if (!AUTH_TOKEN) return;
-  try {
-    const usage = await fetch(AGENT + "/api/storage/usage", { headers: authHeaders() }).then(r => r.json());
-    document.getElementById("storage-usage").textContent =
-      "Used " + usage.used_gb + " GB" + (usage.quota_gb ? " / " + usage.quota_gb + " GB quota" : " / unlimited");
-
-    const listing = await fetch(AGENT + "/api/storage/list?path=", { headers: authHeaders() }).then(r => r.json());
-    const tbody = document.querySelector("#storage-table tbody");
-    tbody.innerHTML = listing.entries.map(e => `
-      <tr><td>${e.name}</td><td>${e.is_dir ? "dir" : "file"}</td>
-      <td>${e.size_bytes === null ? "-" : e.size_bytes + " B"}</td>
-      <td>${e.modified.slice(0,19).replace("T"," ")}</td></tr>`).join("");
-  } catch (e) { /* not logged in or agent offline */ }
-}
-
-async function loadApps() {
-  if (!AUTH_TOKEN) return;
-  try {
-    const apps = await fetch(AGENT + "/api/apps", { headers: authHeaders() }).then(r => r.json());
-    document.getElementById("apps-empty").style.display = apps.length ? "none" : "block";
-    const tbody = document.querySelector("#apps-table tbody");
-    tbody.innerHTML = apps.map(a => `
-      <tr><td>${a.name}</td><td>${a.app_type}</td>
-      <td>${a.status === "running" ? '<span class="badge yes">running</span>' : '<span class="badge no">stopped</span>'}</td></tr>`).join("");
-  } catch (e) { /* not logged in or agent offline */ }
-}
-
-async function loadCloudflare() {
-  try {
-    const avail = await fetch(AGENT + "/api/cloudflare/available").then(r => r.json());
-    const el = document.getElementById("cf-status");
-    if (!avail.cloudflared_available) {
-      el.innerHTML = 'cloudflared not installed on this host — <span style="color:var(--text)">Cloudflare Tunnel is fully optional</span>, LAN/web hosting works without it.';
-      return;
+    // AUTH & LOGIN
+    function checkAuth() {
+      const gate = document.getElementById("login-gate");
+      if (!AUTH_TOKEN) {
+        gate.style.display = "flex";
+      } else {
+        gate.style.display = "none";
+        document.getElementById("header-username").textContent = CURRENT_USER;
+        document.getElementById("avatar-initials").textContent = CURRENT_USER.slice(0, 2).toUpperCase();
+        loadAllData();
+      }
     }
-    if (!AUTH_TOKEN) { el.textContent = "log in to view tunnel status"; return; }
-    const status = await fetch(AGENT + "/api/cloudflare/status", { headers: authHeaders() }).then(r => r.json());
-    el.textContent = status.tunnels.length
-      ? status.tunnels.map(t => `${t.name}: ${t.status}`).join(", ")
-      : "No tunnels configured yet.";
-  } catch (e) { /* agent offline */ }
-}
 
-loadCloudflare();  // unauthenticated availability check runs immediately
-setInterval(() => { loadWebsites(); loadStorage(); loadApps(); }, 5000);
-</script>
+    async function handleLogin() {
+      const user = document.getElementById("input-username").value.trim();
+      const pass = document.getElementById("input-password").value;
+      const statusMsg = document.getElementById("login-status-msg");
+      const btn = document.getElementById("btn-submit-login");
+
+      statusMsg.textContent = "Authenticating…";
+      statusMsg.style.color = "var(--accent)";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(AGENT + "/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: user, password: pass }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusMsg.textContent = data.detail || "Authentication failed.";
+          statusMsg.style.color = "var(--danger)";
+          btn.disabled = false;
+          return;
+        }
+
+        AUTH_TOKEN = data.access_token;
+        CURRENT_USER = user;
+        localStorage.setItem("cyan_jwt_token", AUTH_TOKEN);
+        localStorage.setItem("cyan_user", CURRENT_USER);
+
+        statusMsg.textContent = "Login successful!";
+        statusMsg.style.color = "var(--accent2)";
+        setTimeout(() => {
+          btn.disabled = false;
+          checkAuth();
+        }, 400);
+      } catch (err) {
+        statusMsg.textContent = "Agent unreachable at :7331";
+        statusMsg.style.color = "var(--danger)";
+        btn.disabled = false;
+      }
+    }
+
+    function handleLogout() {
+      AUTH_TOKEN = null;
+      localStorage.removeItem("cyan_jwt_token");
+      localStorage.removeItem("cyan_user");
+      checkAuth();
+    }
+
+    function togglePasswordVisibility() {
+      const pass = document.getElementById("input-password");
+      const icon = document.getElementById("eye-icon");
+      if (pass.type === "password") {
+        pass.type = "text";
+        icon.className = "bx bx-hide";
+      } else {
+        pass.type = "password";
+        icon.className = "bx bx-show";
+      }
+    }
+
+    // TABS
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
+      event.currentTarget.classList.add("active");
+      document.getElementById("tab-" + tabId).classList.add("active");
+    }
+
+    // MODALS
+    function openModal(id) { document.getElementById(id).classList.add("active"); }
+    function closeModal(id) { document.getElementById(id).classList.remove("active"); }
+
+    function updateDbIdPreview() {
+      const val = document.getElementById("db-input-name").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      document.getElementById("preview-db-id").textContent = val ? val + "_[random]" : "...";
+    }
+
+    function updateBucketIdPreview() {
+      const val = document.getElementById("bucket-input-name").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      document.getElementById("preview-bucket-id").textContent = val ? val + "_[random]" : "...";
+    }
+
+    // SYSTEM STATS POLLING
+    async function pollLiveMetrics() {
+      try {
+        const live = await fetch(AGENT + "/api/system/live").then(r => r.json());
+        document.getElementById("metric-cpu").textContent = live.cpu_percent.toFixed(1) + "%";
+        document.getElementById("bar-cpu").style.width = live.cpu_percent + "%";
+
+        document.getElementById("metric-ram").textContent = live.ram_percent.toFixed(1) + "%";
+        document.getElementById("metric-ram-sub").textContent = `${live.ram_used_gb.toFixed(1)} GB of ${live.ram_total_gb.toFixed(1)} GB used`;
+        document.getElementById("bar-ram").style.width = live.ram_percent + "%";
+
+        const health = await fetch(AGENT + "/api/health").then(r => r.json());
+        document.getElementById("metric-uptime").textContent = Math.round(health.uptime_seconds) + "s";
+        document.getElementById("header-status-dot").className = "status-dot online";
+        document.getElementById("header-status-text").textContent = "Online";
+      } catch (e) {
+        document.getElementById("header-status-dot").className = "status-dot offline";
+        document.getElementById("header-status-text").textContent = "Offline";
+      }
+    }
+
+    async function loadSystem() {
+      try {
+        const sys = await fetch(AGENT + "/api/system").then(r => r.json());
+        document.getElementById("metric-profile").textContent = "Profile: " + sys.resource_profile;
+
+        const diskBody = document.querySelector("#table-disks tbody");
+        diskBody.innerHTML = sys.disks.map(d => `
+          <tr>
+            <td><strong>${d.mountpoint}</strong></td>
+            <td>${d.device}</td>
+            <td><code>${d.fstype}</code></td>
+            <td>${d.used_gb} GB</td>
+            <td>${d.free_gb} GB</td>
+            <td>${d.total_gb} GB</td>
+          </tr>
+        `).join("");
+
+        const netBody = document.querySelector("#table-network tbody");
+        netBody.innerHTML = sys.network_interfaces.map(n => `
+          <tr>
+            <td><strong>${n.name}</strong></td>
+            <td><code>${n.address || "—"}</code></td>
+            <td><span class="badge ${n.is_up ? 'badge-ok' : 'badge-danger'}">${n.is_up ? 'UP' : 'DOWN'}</span></td>
+          </tr>
+        `).join("");
+      } catch (e) {}
+    }
+
+    // DATABASES
+    async function loadDatabases() {
+      if (!AUTH_TOKEN) return;
+      try {
+        const dbs = await fetch(AGENT + "/api/database", { headers: authHeaders() }).then(r => r.json());
+        const tbody = document.getElementById("tbody-databases");
+        const selectQuery = document.getElementById("select-query-db");
+        selectQuery.innerHTML = "";
+
+        if (!dbs || dbs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class='bx bx-data'></i>No databases created yet. Click "+ New Database" to provision one.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = dbs.map(d => {
+          const uid = d.unique_id || d.name;
+          selectQuery.innerHTML += `<option value="${uid}">${d.name} (${uid})</option>`;
+          return `
+            <tr>
+              <td><span class="unique-id-tag"><i class='bx bx-fingerprint'></i> ${uid}</span></td>
+              <td><strong>${d.name}</strong></td>
+              <td><span class="badge badge-ok">${d.engine}</span></td>
+              <td><span style="font-size:12px; color:var(--muted)">Active</span></td>
+              <td><span style="font-size:12px; color:var(--muted)">${d.created_at.slice(0, 19).replace('T', ' ')}</span></td>
+              <td>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="handleDeleteDb('${uid}')"><i class='bx bx-trash'></i> Delete</button>
+              </td>
+            </tr>
+          `;
+        }).join("");
+      } catch (err) {}
+    }
+
+    async function handleCreateDatabase() {
+      const name = document.getElementById("db-input-name").value.trim();
+      const engine = document.getElementById("db-input-engine").value;
+      try {
+        const res = await fetch(AGENT + "/api/database", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ name, engine })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Error: " + (err.detail || "Failed to create database"));
+          return;
+        }
+        closeModal("modal-create-db");
+        document.getElementById("db-input-name").value = "";
+        loadDatabases();
+      } catch (err) { alert("Failed to connect to agent"); }
+    }
+
+    async function handleDeleteDb(uid) {
+      if (!confirm(`Are you sure you want to delete database ${uid}?`)) return;
+      try {
+        await fetch(AGENT + `/api/database/${uid}?permanent=true`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        loadDatabases();
+      } catch (err) { alert("Delete failed"); }
+    }
+
+    async function executeQuery() {
+      const dbId = document.getElementById("select-query-db").value;
+      const sql = document.getElementById("input-query-sql").value.trim();
+      const statusMsg = document.getElementById("query-status-msg");
+      const container = document.getElementById("query-results-container");
+      const table = document.getElementById("table-query-results");
+
+      if (!dbId) { alert("Please select a database first"); return; }
+      statusMsg.textContent = "Executing query…";
+      statusMsg.style.color = "var(--accent)";
+
+      try {
+        const res = await fetch(AGENT + `/api/database/${dbId}/query`, {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ sql })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusMsg.textContent = "Error: " + (data.detail || "Query failed");
+          statusMsg.style.color = "var(--danger)";
+          container.style.display = "none";
+          return;
+        }
+
+        const rows = data.rows || [];
+        const cols = data.columns || [];
+        statusMsg.textContent = `Query OK — ${rows.length} row(s) returned`;
+        statusMsg.style.color = "var(--accent2)";
+
+        if (cols.length > 0) {
+          let html = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>`;
+          html += rows.map(r => `<tr>${cols.map(c => `<td>${r[c] !== null ? r[c] : '<em>null</em>'}</td>`).join("")}</tr>`).join("");
+          html += `</tbody>`;
+          table.innerHTML = html;
+          container.style.display = "block";
+        } else {
+          container.style.display = "none";
+        }
+      } catch (err) {
+        statusMsg.textContent = "Failed to run query";
+        statusMsg.style.color = "var(--danger)";
+      }
+    }
+
+    // STORAGE BUCKETS
+    async function loadBuckets() {
+      if (!AUTH_TOKEN) return;
+      try {
+        const res = await fetch(AGENT + "/api/storage/buckets", { headers: authHeaders() }).then(r => r.json());
+        const buckets = res.buckets || [];
+        const tbody = document.getElementById("tbody-buckets");
+
+        if (buckets.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><i class='bx bx-cabinet'></i>No storage buckets yet. Click "+ New Bucket" to create an isolated vault.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = buckets.map(b => `
+          <tr>
+            <td><span class="unique-id-tag"><i class='bx bx-barcode'></i> ${b.unique_id}</span></td>
+            <td><strong>${b.name}</strong></td>
+            <td><span style="font-size:12px; color:var(--muted)">${b.description || "—"}</span></td>
+            <td><strong>${b.file_count}</strong> files</td>
+            <td><code>${b.size_mb.toFixed(2)} MB</code></td>
+            <td><span style="font-size:12px; color:var(--muted)">${b.created_at.slice(0, 19).replace('T', ' ')}</span></td>
+            <td>
+              <div style="display:flex; gap:6px">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px" onclick="exploreBucket('${b.unique_id}')"><i class='bx bx-folder-open'></i> Open</button>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="handleDeleteBucket('${b.unique_id}')"><i class='bx bx-trash'></i></button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+      } catch (err) {}
+    }
+
+    async function handleCreateBucket() {
+      const name = document.getElementById("bucket-input-name").value.trim();
+      const desc = document.getElementById("bucket-input-desc").value.trim();
+      try {
+        const res = await fetch(AGENT + "/api/storage/buckets", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ name, description: desc })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Error: " + (err.detail || "Failed to create bucket"));
+          return;
+        }
+        closeModal("modal-create-bucket");
+        document.getElementById("bucket-input-name").value = "";
+        document.getElementById("bucket-input-desc").value = "";
+        loadBuckets();
+      } catch (err) { alert("Failed to connect to agent"); }
+    }
+
+    async function handleDeleteBucket(bucketId) {
+      if (!confirm(`Are you sure you want to delete bucket ${bucketId}?`)) return;
+      try {
+        await fetch(AGENT + `/api/storage/buckets/${bucketId}?permanent=true`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        if (activeBucketId === bucketId) {
+          document.getElementById("bucket-explorer").style.display = "none";
+        }
+        loadBuckets();
+      } catch (err) { alert("Failed to delete bucket"); }
+    }
+
+    async function exploreBucket(bucketId) {
+      activeBucketId = bucketId;
+      document.getElementById("active-bucket-title").textContent = bucketId;
+      document.getElementById("bucket-explorer").style.display = "block";
+      loadBucketFiles();
+    }
+
+    async function loadBucketFiles() {
+      if (!activeBucketId || !AUTH_TOKEN) return;
+      try {
+        const res = await fetch(AGENT + `/api/storage/buckets/${activeBucketId}/files`, { headers: authHeaders() }).then(r => r.json());
+        const files = res.files || [];
+        const tbody = document.getElementById("tbody-bucket-files");
+
+        if (files.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" class="empty-state"><i class='bx bx-file-blank'></i>Bucket is empty. Click "Upload File" to add files.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = files.map(f => `
+          <tr>
+            <td><strong><i class='bx bx-file' style="color:var(--accent); margin-right:6px"></i>${f.name}</strong></td>
+            <td><code>${f.size_kb} KB</code></td>
+            <td><span style="font-size:12px; color:var(--muted)">${f.modified.slice(0, 19).replace('T', ' ')}</span></td>
+            <td>
+              <div style="display:flex; gap:6px">
+                <a class="btn btn-secondary" style="padding:4px 8px; font-size:11px; text-decoration:none" href="${AGENT}/api/v1/storage/${activeBucketId}/download/${f.name}" target="_blank"><i class='bx bx-download'></i> Download</a>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="handleDeleteBucketFile('${f.name}')"><i class='bx bx-trash'></i></button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+      } catch (err) {}
+    }
+
+    async function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file || !activeBucketId) return;
+
+      const fd = new FormData();
+      fd.append("file", file);
+
+      try {
+        const res = await fetch(AGENT + `/api/storage/buckets/${activeBucketId}/upload`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: fd
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Upload failed: " + (err.detail || "Server rejected file"));
+          return;
+        }
+        loadBucketFiles();
+        loadBuckets();
+      } catch (err) { alert("Upload request failed"); }
+    }
+
+    async function handleDeleteBucketFile(filename) {
+      if (!confirm(`Delete file "${filename}"?`)) return;
+      try {
+        await fetch(AGENT + `/api/v1/storage/${activeBucketId}/files/${filename}?permanent=true`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        loadBucketFiles();
+        loadBuckets();
+      } catch (err) { alert("Failed to delete file"); }
+    }
+
+    // API KEYS
+    async function loadApiKeys() {
+      if (!AUTH_TOKEN) return;
+      try {
+        const keys = await fetch(AGENT + "/api/keys", { headers: authHeaders() }).then(r => r.json());
+        const tbody = document.getElementById("tbody-keys");
+
+        if (!keys || keys.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class='bx bx-key'></i>No API keys generated yet. Click "+ Generate API Key" to create your universal key.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = keys.map(k => `
+          <tr>
+            <td><span style="font-size:12px; color:var(--muted)">${k.id}</span></td>
+            <td><strong>${k.name}</strong></td>
+            <td>
+              <code style="background:rgba(15,23,42,0.8); padding:3px 8px; border-radius:4px; font-size:12px; color:var(--accent)">
+                ${k.key.slice(0, 16)}••••••••••••••••
+              </code>
+              <button class="btn btn-secondary" style="padding:2px 6px; font-size:10px; margin-left:6px" onclick="navigator.clipboard.writeText('${k.key}'); alert('API Key copied to clipboard!')"><i class='bx bx-copy'></i> Copy</button>
+            </td>
+            <td><span class="badge badge-ok">${k.permissions}</span></td>
+            <td><span style="font-size:12px; color:var(--muted)">${k.last_used_at ? k.last_used_at.slice(0, 19).replace('T', ' ') : 'Never'}</span></td>
+            <td>
+              <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="handleRevokeKey('${k.id}')"><i class='bx bx-x-circle'></i> Revoke</button>
+            </td>
+          </tr>
+        `).join("");
+      } catch (err) {}
+    }
+
+    async function handleCreateApiKey() {
+      const name = document.getElementById("key-input-name").value.trim();
+      const perm = document.getElementById("key-input-perm").value;
+      try {
+        const res = await fetch(AGENT + "/api/keys", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ name, permissions: perm })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Error: " + (err.detail || "Failed to create API key"));
+          return;
+        }
+        const data = await res.json();
+        closeModal("modal-create-key");
+        document.getElementById("key-input-name").value = "";
+        alert(`API Key Generated!\n\nToken: ${data.key}\n\nMake sure to copy and store it safely.`);
+        loadApiKeys();
+      } catch (err) { alert("Failed to connect to agent"); }
+    }
+
+    async function handleRevokeKey(id) {
+      if (!confirm("Are you sure you want to revoke this API key?")) return;
+      try {
+        await fetch(AGENT + `/api/keys/${id}`, { method: "DELETE", headers: authHeaders() });
+        loadApiKeys();
+      } catch (err) { alert("Failed to revoke key"); }
+    }
+
+    // WEBSITES & APPS
+    async function loadWebsites() {
+      if (!AUTH_TOKEN) return;
+      try {
+        const sites = await fetch(AGENT + "/api/web", { headers: authHeaders() }).then(r => r.json());
+        const tbody = document.getElementById("tbody-websites");
+        if (!sites || sites.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class='bx bx-globe'></i>No websites created yet. Deploy sites with <code>cyan web create</code>.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = sites.map(s => `
+          <tr>
+            <td><strong>${s.name}</strong></td>
+            <td><span class="badge badge-ok">${s.site_type}</span></td>
+            <td><code>${s.port}</code></td>
+            <td>${s.domain || "—"}</td>
+            <td><span class="badge ${s.status === 'running' ? 'badge-ok' : 'badge-danger'}">${s.status}</span></td>
+            <td><a href="http://${location.hostname}:${s.port}" target="_blank" style="color:var(--accent); text-decoration:none; font-weight:600"><i class='bx bx-link-external'></i> Open</a></td>
+          </tr>
+        `).join("");
+      } catch (err) {}
+    }
+
+    async function loadCloudflare() {
+      try {
+        const avail = await fetch(AGENT + "/api/cloudflare/available").then(r => r.json());
+        const badge = document.getElementById("badge-cf-status");
+        const details = document.getElementById("cf-details");
+        if (!avail.cloudflared_available) {
+          badge.className = "badge badge-warn";
+          badge.textContent = "Not Installed";
+          details.textContent = "cloudflared is not installed on this host. Local network hosting is fully active.";
+          return;
+        }
+        badge.className = "badge badge-ok";
+        badge.textContent = "Available";
+        if (AUTH_TOKEN) {
+          const status = await fetch(AGENT + "/api/cloudflare/status", { headers: authHeaders() }).then(r => r.json());
+          details.textContent = status.tunnels && status.tunnels.length > 0
+            ? `Active tunnels: ${status.tunnels.map(t => `${t.name} (${t.status})`).join(", ")}`
+            : "No Cloudflare tunnels configured yet.";
+        }
+      } catch (err) {}
+    }
+
+    function copyCode(btn) {
+      const code = btn.parentElement.innerText.replace("Copy", "").trim();
+      navigator.clipboard.writeText(code);
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = "Copy", 2000);
+    }
+
+    function loadAllData() {
+      pollLiveMetrics();
+      loadSystem();
+      loadDatabases();
+      loadBuckets();
+      loadApiKeys();
+      loadWebsites();
+      loadCloudflare();
+    }
+
+    // INITIALIZATION
+    checkAuth();
+    setInterval(pollLiveMetrics, 3000);
+    setInterval(loadSystem, 15000);
+    setInterval(() => {
+      if (AUTH_TOKEN) {
+        loadDatabases();
+        loadBuckets();
+        loadWebsites();
+      }
+    }, 10000);
+  </script>
 </body>
 </html>

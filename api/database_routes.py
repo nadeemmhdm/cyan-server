@@ -13,7 +13,10 @@ router = APIRouter(prefix="/api/database", tags=["database"])
 
 def _serialize(db) -> dict:
     return {
-        "id": db.id, "name": db.name, "engine": db.engine,
+        "id": db.id,
+        "unique_id": getattr(db, "unique_id", None) or db.name,
+        "name": db.name,
+        "engine": db.engine,
         "connection_info": json.loads(db.connection_info),
         "created_at": db.created_at.isoformat(),
     }

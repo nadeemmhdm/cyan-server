@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from pathlib import Path
 
 from core.database import TunnelConfig, TunnelHostname, get_session
 
@@ -86,7 +87,7 @@ def add_hostname(tunnel_name: str, hostname: str, local_service: str) -> TunnelH
         session.close()
 
 
-def start_tunnel(tunnel_name: str) -> subprocess.Popen:
+def start_tunnel(tunnel_name: str, config_path: str | Path | None = None) -> subprocess.Popen:
     if not cloudflared_available():
         raise TunnelError("cloudflared is not installed on this host")
     session = get_session()
@@ -99,10 +100,53 @@ def start_tunnel(tunnel_name: str) -> subprocess.Popen:
     finally:
         session.close()
 
+    cmd = ["cloudflared", "tunnel"]
+    if config_path:
+        cmd.extend(["--config", str(config_path)])
+    else:
+        # Cross-platform config detection: check ~/.cloudflared/config.yml or workspace config
+        candidates = [
+            Path.home() / ".cloudflared" / "config.yml",
+            Path.cwd() / "tunnel_config.yml",
+        ]
+        for c in candidates:
+            if c.exists():
+                cmd.extend(["--config", str(c)])
+                break
+
+    cmd.extend(["run", tunnel_name])
+
+    import sys
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
     return subprocess.Popen(
-        ["cloudflared", "tunnel", "run", tunnel_name],
+        cmd,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
     )
+
+
+def stop_tunnel(tunnel_name: str) -> None:
+    """Universally terminate cloudflared tunnel processes across OS platforms."""
+    import psutil
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            cmdline = " ".join(proc.info["cmdline"] or [])
+            if "cloudflared" in (proc.info["name"] or "").lower() and tunnel_name in cmdline:
+                proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    session = get_session()
+    try:
+        cfg = session.query(TunnelConfig).filter_by(tunnel_name=tunnel_name).first()
+        if cfg:
+            cfg.status = "disabled"
+            session.commit()
+    finally:
+        session.close()
 
 
 def status() -> list[dict]:

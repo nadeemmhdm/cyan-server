@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyan Server — Website Deployed Successfully</title>
+  <meta name="description" content="Default starter page for newly created Cyan Server websites.">
+  
+  <!-- Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Boxicons -->
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #070a0f;
+      --card-bg: rgba(15, 23, 36, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(34, 211, 238, 0.35);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #22d3ee;
+      --accent-glow: rgba(34, 211, 238, 0.2);
+      --emerald: #10b981;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Background Ambient Glow */
+    .glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(140px);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .glow-1 { width: 450px; height: 450px; background: rgba(34, 211, 238, 0.15); top: -80px; left: -80px; }
+    .glow-2 { width: 400px; height: 400px; background: rgba(16, 185, 129, 0.12); bottom: -60px; right: -60px; }
+
+    header {
+      position: relative;
+      z-index: 2;
+      padding: 24px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #22d3ee, #0284c7);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #070a0f;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-title span { color: var(--accent); }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--emerald);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--emerald);
+      animation: pulse-ring 1.8s infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    main {
+      position: relative;
+      z-index: 2;
+      max-width: 920px;
+      margin: 60px auto;
+      padding: 0 24px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(34, 211, 238, 0.1);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 620px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: left;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      margin-bottom: 36px;
+    }
+
+    .card h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--accent);
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      width: 32px;
+      height: 32px;
+      background: rgba(34, 211, 238, 0.15);
+      border: 1px solid var(--border-glow);
+      color: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .step-content strong {
+      font-size: 15px;
+      color: var(--text);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .code-box {
+      margin-top: 10px;
+      background: #03060a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #22d3ee, #0284c7);
+      color: #070a0f;
+      box-shadow: 0 4px 16px var(--accent-glow);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 22px rgba(34, 211, 238, 0.4);
+    }
+
+    .btn-glass {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-glass:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-2px);
+    }
+
+    footer {
+      position: relative;
+      z-index: 2;
+      padding: 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      header { padding: 16px; }
+      main { padding: 0 16px; margin: 30px auto; }
+      .card { padding: 20px; }
+      .btn-group { flex-direction: column; }
+      .btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon"><i class="bx bx-server"></i></div>
+      <div class="brand-title">Cyan<span>Server</span></div>
+    </div>
+    <div class="status-pill">
+      <span class="pulse"></span> Live &bull; Active
+    </div>
+  </header>
+
+  <main>
+    <div class="badge"><i class="bx bx-check-circle"></i> Site Created Successfully</div>
+    <h1>Your Website is <span style="color: var(--accent);">Live &amp; Ready</span></h1>
+    <p class="subtitle">
+      Cyan Server has provisioned your web server and reverse proxy. Follow the steps below to replace this default page with your own website code.
+    </p>
+
+    <div class="card">
+      <h2><i class="bx bx-code-curly"></i> How to Publish Your Website</h2>
+      <div class="steps">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <strong>Locate Your Website Folder</strong>
+            <p>Your site files are stored inside your Cyan Server sites directory. You can access it directly on your computer:</p>
+            <div class="code-box">
+              <span><i class="bx bx-folder"></i> ~/.cyan-server/sites/&lt;your-site-name&gt;/</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <strong>Add or Replace Files</strong>
+            <p>Simply delete or edit this <code>index.html</code> file and paste your own HTML, CSS, JavaScript, React, or backend code.</p>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <strong>Instant Live Reload</strong>
+            <p>Static file changes take effect on the very next refresh—no server restart required! You can also manage files directly from the Cyan CLI or Dashboard.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <a href="http://localhost:7331" class="btn btn-primary" target="_blank">
+        <i class="bx bxs-dashboard"></i> Open Cyan Dashboard
+      </a>
+      <a href="https://github.com/nadeemmhdm/cyan-server" class="btn btn-glass" target="_blank">
+        <i class="bx bxl-github"></i> Documentation &amp; Help
+      </a>
+    </div>
+  </main>
+
+  <footer>
+    <i class="bx bx-server"></i> Powered by <a href="https://github.com/nadeemmhdm/cyan-server" target="_blank">Cyan Server</a> &bull; Apache 2.0
+  </footer>
+</body>
+</html>

@@ -21,7 +21,7 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
-from core.database import ManagedDatabase, get_session
+from core.database import ManagedDatabase, get_session, generate_unique_id
 
 def _sqlite_dir() -> Path:
     """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
@@ -79,7 +79,8 @@ def create_database(name: str, engine: str = "sqlite") -> ManagedDatabase:
 
     session = get_session()
     try:
-        row = ManagedDatabase(name=name, engine=engine, connection_info=json.dumps(connection_info))
+        unique_id = generate_unique_id(name)
+        row = ManagedDatabase(name=name, unique_id=unique_id, engine=engine, connection_info=json.dumps(connection_info))
         session.add(row)
         session.commit()
         session.refresh(row)
@@ -96,12 +97,14 @@ def list_databases() -> list[ManagedDatabase]:
         session.close()
 
 
-def get_database(name: str) -> ManagedDatabase:
+def get_database(identifier: str) -> ManagedDatabase:
     session = get_session()
     try:
-        row = session.query(ManagedDatabase).filter_by(name=name).first()
+        row = session.query(ManagedDatabase).filter(
+            (ManagedDatabase.unique_id == identifier) | (ManagedDatabase.name == identifier)
+        ).first()
         if not row:
-            raise DatabaseError(f"Database '{name}' not found")
+            raise DatabaseError(f"Database '{identifier}' not found")
         return row
     finally:
         session.close()
@@ -158,23 +161,33 @@ def get_status(name: str) -> dict:
     raise DatabaseError(f"Unsupported engine: {db.engine}")
 
 
-def execute_query(name: str, sql: str) -> dict:
-    """Admin-only management queries (create table, inspect data, etc.) —
-    gated by the same require_admin dependency as everything destructive
-    in this codebase. Returns rows for SELECT-like statements, or a row
-    count for statements that modify data."""
+def execute_query(name: str, sql: str, params: tuple | list | dict | None = None) -> dict:
+    """Execute queries against a managed database.
+    Supports parameterized bindings (? or :name) for complete SQL injection protection.
+    Returns rows for SELECT-like statements, or rowcount for statements that modify data."""
+    # Disallow hazardous administrative PRAGMAs or dangerous attachments
+    upper_sql = sql.upper().strip()
+    disallowed_keywords = ["ATTACH DATABASE", "DETACH DATABASE", "PRAGMA WRITABLE_SCHEMA"]
+    for keyword in disallowed_keywords:
+        if keyword in upper_sql:
+            raise DatabaseError(f"Hazardous query rejected: {keyword} is not permitted.")
+
     db = get_database(name)
     info = json.loads(db.connection_info)
 
     if db.engine == "sqlite":
         conn = sqlite3.connect(info["path"])
         try:
-            cursor = conn.execute(sql)
+            if params:
+                cursor = conn.execute(sql, params)
+            else:
+                cursor = conn.execute(sql)
+
             if cursor.description:
                 columns = [d[0] for d in cursor.description]
                 rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
                 conn.commit()
-                return {"columns": columns, "rows": rows}
+                return {"columns": columns, "rows": rows, "rowcount": len(rows)}
             conn.commit()
             return {"columns": [], "rows": [], "rowcount": cursor.rowcount}
         except sqlite3.Error as e:
@@ -183,6 +196,7 @@ def execute_query(name: str, sql: str) -> dict:
             conn.close()
 
     if db.engine == "postgres":
+        # For Postgres, execute via psql
         result = subprocess.run(["psql", "-d", info["database"], "-c", sql],
                                  capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
@@ -192,13 +206,15 @@ def execute_query(name: str, sql: str) -> dict:
     raise DatabaseError(f"Unsupported engine: {db.engine}")
 
 
-def delete_database(name: str, permanent: bool = False) -> None:
-    db = get_database(name)
+def delete_database(identifier: str, permanent: bool = False) -> None:
+    db = get_database(identifier)
     info = json.loads(db.connection_info)
 
     session = get_session()
     try:
-        row = session.query(ManagedDatabase).filter_by(name=name).first()
+        row = session.query(ManagedDatabase).filter(
+            (ManagedDatabase.unique_id == identifier) | (ManagedDatabase.name == identifier)
+        ).first()
         if row:
             session.delete(row)
             session.commit()
@@ -213,7 +229,7 @@ def delete_database(name: str, permanent: bool = False) -> None:
             path.unlink()
         else:
             from trash.manager import move_to_trash
-            move_to_trash("database", name, name, path, metadata={"engine": "sqlite"})
+            move_to_trash("database", db.name, db.name, path, metadata={"engine": "sqlite"})
 
     elif db.engine == "postgres":
         # Postgres databases aren't files — there's no straightforward
@@ -221,7 +237,7 @@ def delete_database(name: str, permanent: bool = False) -> None:
         # real drop. (A pg_dump-based trash is a reasonable future
         # improvement, not implemented here.)
         if postgres_available():
-            subprocess.run(["dropdb", "--if-exists", name], capture_output=True, timeout=30)
+            subprocess.run(["dropdb", "--if-exists", db.name], capture_output=True, timeout=30)
 
 
 def restore_database(trash_id: int) -> ManagedDatabase:

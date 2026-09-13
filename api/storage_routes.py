@@ -92,3 +92,58 @@ def resolve_share(token: str):
         return Response(content=content, media_type="application/octet-stream")
     except storage_manager.StorageError as e:
         raise HTTPException(404, str(e))
+
+
+# --- Storage Buckets (Dashboard & CLI Management) ----------------------------
+
+class CreateBucketRequest(BaseModel):
+    name: str
+    description: str | None = None
+
+
+@router.get("/buckets")
+def list_storage_buckets(_=Depends(require_auth)):
+    return {"buckets": storage_manager.list_buckets()}
+
+
+@router.post("/buckets")
+def create_storage_bucket(req: CreateBucketRequest, _=Depends(require_auth)):
+    try:
+        bucket = storage_manager.create_bucket(req.name, req.description)
+        return {
+            "success": True,
+            "id": bucket.id,
+            "unique_id": bucket.unique_id,
+            "name": bucket.name,
+            "description": bucket.description or "",
+            "created_at": bucket.created_at.isoformat(),
+        }
+    except storage_manager.StorageError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/buckets/{identifier}/files")
+def list_bucket_files(identifier: str, _=Depends(require_auth)):
+    try:
+        return {"bucket_id": identifier, "files": storage_manager.list_bucket_files(identifier)}
+    except storage_manager.StorageError as e:
+        raise HTTPException(404, str(e))
+
+
+@router.post("/buckets/{identifier}/upload")
+async def upload_bucket_file(identifier: str, file: UploadFile = File(...), _=Depends(require_auth)):
+    try:
+        content = await file.read()
+        return storage_manager.save_bucket_file(identifier, file.filename, content)
+    except storage_manager.StorageError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.delete("/buckets/{identifier}")
+def delete_storage_bucket(identifier: str, permanent: bool = False, _=Depends(require_auth)):
+    try:
+        storage_manager.delete_bucket(identifier, permanent=permanent)
+        return {"success": True, "bucket_id": identifier}
+    except storage_manager.StorageError as e:
+        raise HTTPException(400, str(e))
+

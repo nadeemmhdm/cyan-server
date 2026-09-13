@@ -55,7 +55,12 @@ def start_tunnel(name: str, port: int, hostname: str | None = None) -> TunnelCon
     if hostname:
         cmd.append(f"--domain={hostname}")
 
-    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    import sys
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+
+    subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=creationflags)
 
     # Give ngrok a moment to bring up its local API before the caller
     # asks get_public_url() what happened.
@@ -97,7 +102,19 @@ def get_public_url(port: int | None = None) -> str | None:
 def stop_tunnel(name: str) -> None:
     if not ngrok_available():
         raise NgrokError("ngrok is not installed on this host")
-    subprocess.run(["pkill", "-f", "ngrok http"], capture_output=True, timeout=10)
+    import psutil
+    killed = False
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            name_lower = (proc.info["name"] or "").lower()
+            cmdline = " ".join(proc.info["cmdline"] or [])
+            if "ngrok" in name_lower or "ngrok http" in cmdline:
+                proc.terminate()
+                killed = True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    if not killed and shutil.which("pkill"):
+        subprocess.run(["pkill", "-f", "ngrok http"], capture_output=True, timeout=10)
 
     session = get_session()
     try:

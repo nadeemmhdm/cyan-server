@@ -5,3 +5,5 @@ __pycache__/
 agent.log
 *.egg-info/
 node_modules/
+scratch/
+tunnel_config.yml

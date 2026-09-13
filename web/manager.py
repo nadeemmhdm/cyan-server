@@ -65,6 +65,16 @@ def create_site(name: str, site_type: str, source_type: str, source: str,
         if not net_mgr.is_port_available(port):
             raise SiteError(f"Port {port} is already in use")
 
+        if source_type == "folder":
+            src = Path(source)
+            src.mkdir(parents=True, exist_ok=True)
+            index_file = src / "index.html"
+            # If the folder has no index.html and no other code files, add the modern starter template
+            if not index_file.exists() and not any(f for f in src.iterdir() if f.name != "cyan.log"):
+                default_template = Path(__file__).resolve().parent / "templates" / "default_site" / "index.html"
+                if default_template.exists():
+                    shutil.copy(default_template, index_file)
+
         site = Website(
             name=name, site_type=site_type, source_type=source_type,
             source=source, port=port, domain=domain,
@@ -82,22 +92,36 @@ def create_site(name: str, site_type: str, source_type: str, source: str,
 def fetch_source(site: Website) -> Path:
     """Populate the site's working directory from folder/git/docker source."""
     target = _site_dir(site.name)
+    default_template = Path(__file__).resolve().parent / "templates" / "default_site" / "index.html"
 
     if site.source_type == "folder":
         src = Path(site.source)
-        if not src.exists():
-            raise SiteError(f"Source folder does not exist: {src}")
+        src.mkdir(parents=True, exist_ok=True)
+        index_file = src / "index.html"
+        if not index_file.exists() and not any(f for f in src.iterdir() if f.name != "cyan.log"):
+            if default_template.exists():
+                shutil.copy(default_template, index_file)
+
         if src.resolve() != target.resolve():
-            # Windows-safe: don't wipe the target directory outright —
-            # a running site process (especially one that opened its own
-            # log file inside this folder, like the static-site server)
-            # holds a file handle Windows won't let rmtree() past, even
-            # though the equivalent works fine on Linux/macOS. Caught via
-            # real Windows testing (WinError 32 on redeploy). The caller
-            # (deploy_site) now stops the site before calling this, and
-            # copytree's merge mode here means nothing needs deleting for
-            # a normal redeploy anyway.
+            # Sync target with src: remove files from target that were deleted in src (preserve cyan.log)
+            if target.exists():
+                for item in list(target.iterdir()):
+                    if item.name == "cyan.log":
+                        continue
+                    if not (src / item.name).exists():
+                        if item.is_dir():
+                            shutil.rmtree(item, ignore_errors=True)
+                        else:
+                            try:
+                                item.unlink()
+                            except OSError:
+                                pass
             shutil.copytree(src, target, dirs_exist_ok=True)
+
+        target_index = target / "index.html"
+        if not target_index.exists() and not any(f for f in target.iterdir() if f.name != "cyan.log"):
+            if default_template.exists():
+                shutil.copy(default_template, target_index)
         return target
 
     if site.source_type == "git":
@@ -142,7 +166,7 @@ def _start_command(site: Website, path: Path) -> list[str] | None:
         main = path / "main.py"
         if not main.exists():
             raise SiteError("python site requires a main.py entrypoint")
-        return [sys.executable, str(main)]
+        return [sys.executable, "-u", str(main)]
 
     if site.site_type == "php":
         if not shutil.which("php"):
@@ -200,6 +224,10 @@ def deploy_site(name: str) -> Website:
         env = os.environ.copy()
         env.update(json.loads(site.env_vars or "{}"))
         env["PORT"] = str(site.port)
+        repo_root = str(Path(__file__).resolve().parent.parent)
+        env["CYAN_SERVER_ROOT"] = repo_root
+        existing_pythonpath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{repo_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else repo_root
 
         if site.site_type == "docker":
             if not shutil.which("docker"):
@@ -218,9 +246,24 @@ def deploy_site(name: str) -> Website:
             if cmd is None:
                 raise SiteError(f"Unsupported site_type: {site.site_type}")
             log_path = path / "cyan.log"
+            popen_kwargs = {
+                "cwd": path,
+                "env": env,
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+                )
+            else:
+                popen_kwargs["start_new_session"] = True
+
             with open(log_path, "a") as logf:
-                proc = subprocess.Popen(cmd, cwd=path, env=env,
-                                         stdout=logf, stderr=subprocess.STDOUT)
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    **popen_kwargs,
+                )
             site.pid = proc.pid
             site.status = "running"
 
@@ -235,6 +278,32 @@ def deploy_site(name: str) -> Website:
         session.close()
 
 
+def kill_process_tree(pid: int, timeout: float = 3.0) -> None:
+    """Universally terminate a process and all of its spawned child processes
+    across Windows, Linux, and macOS using psutil."""
+    import psutil
+    try:
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+        for child in children:
+            try:
+                child.terminate()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        try:
+            parent.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+        gone, alive = psutil.wait_procs(children + [parent], timeout=timeout)
+        for p in alive:
+            try:
+                p.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+        pass
+
+
 def stop_site(name: str) -> Website:
     session = get_session()
     try:
@@ -246,10 +315,7 @@ def stop_site(name: str) -> Website:
             subprocess.run(["docker", "stop", f"cyan-{name}"], capture_output=True, timeout=30)
             subprocess.run(["docker", "rm", f"cyan-{name}"], capture_output=True, timeout=30)
         elif site.pid:
-            try:
-                os.kill(site.pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError, OSError):
-                pass
+            kill_process_tree(site.pid)
 
         site.status = "stopped"
         site.pid = None

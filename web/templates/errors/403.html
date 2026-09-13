@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>403 — Access Forbidden | Cyan Server</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a0f;
+      --card-bg: rgba(15, 23, 36, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(245, 158, 11, 0.35);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --warn: #f59e0b;
+      --warn-glow: rgba(245, 158, 11, 0.2);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow-x: hidden;
+      position: relative;
+    }
+    .glow { position: absolute; border-radius: 50%; filter: blur(140px); pointer-events: none; }
+    .glow-1 { width: 450px; height: 450px; background: rgba(245, 158, 11, 0.15); top: -60px; left: -60px; }
+    .glow-2 { width: 350px; height: 350px; background: rgba(239, 68, 68, 0.12); bottom: -40px; right: -40px; }
+    main {
+      position: relative;
+      z-index: 2;
+      max-width: 680px;
+      margin: auto;
+      padding: 40px 24px;
+      text-align: center;
+    }
+    .error-code {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(80px, 16vw, 140px);
+      font-weight: 900;
+      line-height: 1;
+      background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #ef4444 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.04em;
+      margin-bottom: 12px;
+      text-shadow: 0 0 50px rgba(245, 158, 11, 0.3);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    p {
+      color: var(--text-muted);
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #070a0f;
+      border: none;
+      box-shadow: 0 4px 16px var(--warn-glow);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 22px rgba(245, 158, 11, 0.4);
+    }
+    .btn-glass {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-glass:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-2px);
+    }
+    footer {
+      position: relative;
+      z-index: 2;
+      padding: 20px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <main>
+    <div class="badge"><i class="bx bx-shield-x"></i> Error 403</div>
+    <div class="error-code">403</div>
+    <h1>Access Forbidden</h1>
+    <p>You don't have permission to view or access this resource on the server. Please check your credentials or access rights.</p>
+
+    <div class="btn-group">
+      <a href="/" class="btn btn-primary"><i class="bx bx-home-alt"></i> Return Home</a>
+      <button onclick="history.back()" class="btn btn-glass"><i class="bx bx-left-arrow-alt"></i> Go Back</button>
+    </div>
+  </main>
+
+  <footer>
+    <i class="bx bx-server"></i> Cyan Server Security &bull; 403 Handler
+  </footer>
+</body>
+</html>

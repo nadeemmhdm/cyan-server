@@ -163,13 +163,46 @@ class TrashItem(Base):
     expires_at = Column(DateTime, nullable=False)         # deleted_at + retention period
 
 
+import random
+
+
+def generate_unique_id(name: str) -> str:
+    """Generates an identifier: name_random4to6digits (e.g., mydb_48291)."""
+    clean = "".join(c for c in name.lower().replace("-", "_").replace(" ", "_") if c.isalnum() or c == "_").strip("_")
+    if not clean:
+        clean = "item"
+    rand_num = random.randint(1000, 999999)
+    return f"{clean}_{rand_num}"
+
+
 class ManagedDatabase(Base):
     __tablename__ = "managed_databases"
     id = Column(Integer, primary_key=True)
+    unique_id = Column(String, unique=True, nullable=True, index=True)
     name = Column(String, unique=True, nullable=False)
     engine = Column(String, nullable=False)          # sqlite | postgres
     connection_info = Column(Text, nullable=False)     # JSON: path (sqlite) or dsn parts (postgres)
     created_at = Column(DateTime, default=utcnow)
+
+
+class StorageBucket(Base):
+    __tablename__ = "storage_buckets"
+    id = Column(Integer, primary_key=True)
+    unique_id = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+    id = Column(Integer, primary_key=True)
+    key = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    permissions = Column(String, default="full")  # full | read | write
+    created_at = Column(DateTime, default=utcnow)
+    last_used_at = Column(DateTime, nullable=True)
 
 
 class BackupConfig(Base):
@@ -184,8 +217,41 @@ class BackupConfig(Base):
     last_backup_result = Column(String, nullable=True)
 
 
+def _auto_migrate():
+    """Inspects all SQLAlchemy tables against the active SQLite database
+    and automatically issues ALTER TABLE ADD COLUMN for any newly added columns.
+    Prevents 500 crashes like 'no such column' on schema updates."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        for table_name, table in Base.metadata.tables.items():
+            if table_name in existing_tables:
+                existing_cols = {col["name"] for col in inspector.get_columns(table_name)}
+                for col in table.columns:
+                    if col.name not in existing_cols:
+                        col_type = col.type.compile(engine.dialect)
+                        default = ""
+                        if col.server_default is not None:
+                            default = f"DEFAULT {col.server_default.arg}"
+                        elif col.default is not None and not callable(col.default.arg):
+                            default = f"DEFAULT '{col.default.arg}'"
+                        alter_query = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type} {default}"
+                        conn.execute(text(alter_query))
+
+
 def init_db():
     Base.metadata.create_all(engine)
+    _auto_migrate()
+    session = get_session()
+    try:
+        dbs = session.query(ManagedDatabase).filter(ManagedDatabase.unique_id.is_(None)).all()
+        for d in dbs:
+            d.unique_id = generate_unique_id(d.name)
+        if dbs:
+            session.commit()
+    finally:
+        session.close()
 
 
 def get_session() -> Session:

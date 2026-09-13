@@ -39,8 +39,10 @@ from api.database_routes import router as database_router
 from api.backup_routes import router as backup_router
 from api.ngrok_routes import router as ngrok_router
 from api.tunnel_connect_routes import router as tunnel_connect_router
+from api.apikey_routes import router as apikey_router
+from api.v1_routes import router as v1_router
 
-app = FastAPI(title="Cyan Server Agent", version="0.6.2")
+app = FastAPI(title="Cyan Server Agent", version=VERSION)
 
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -61,6 +63,8 @@ app.include_router(database_router)
 app.include_router(backup_router)
 app.include_router(ngrok_router)
 app.include_router(tunnel_connect_router)
+app.include_router(apikey_router)
+app.include_router(v1_router)
 
 _START_TIME = time.time()
 
