@@ -1,3 +1,39 @@
+# Cyan Server v0.7.2 Release Notes
+
+**Cyan Server v0.7.2** brings a full-featured visual Website Builder to the Cyan Hub Web Dashboard (`http://localhost:7331/`), ZIP archive upload & unpacking, custom domain & tunnel connection dialogs, a first-time user welcome card with quick actions, host PostgreSQL missing-binary detection with zero-config SQLite guidance, write-only API key permission scoping, and an Admin Profile modal with secure password updating.
+
+---
+
+## 🌟 Major Highlights & New Features in v0.7.2
+
+### 1. Dashboard Website Builder & File Manager (`http://localhost:7331/`)
+- **Full Framework Support**: Create and host Static HTML/CSS/JS, React (Vite/CRA), Node.js (Express), Python (FastAPI/Flask), PHP, and Docker containers directly from the web UI.
+- **Starter Content Generation**: Automatically creates a production-grade starter template with Outfit/Inter typography, Boxicons, dark mode, and responsive layout.
+- **Direct ZIP Upload & Auto-Unpack**: Drop or upload `.zip` website bundles. Cyan Server securely unpacks archives into site directories with built-in path-traversal (Zip Slip) protection.
+- **Interactive Site Management**: Table rows now include actions for Start/Stop, Open URL, Connect Domain, Connect Tunnel, Browse & Upload Files, View Logs, and Delete.
+- **Custom Domain Modal**: Connect domains or subdomains with 1-click automatic Caddy reverse proxy reconfiguration and live SSL certificate reload.
+- **Tunnel Connection Modal**: Connect sites to public Cloudflare (`cloudflared`) or ngrok tunnels directly from the web interface, automatically persisting route configurations for reboot auto-resume.
+
+### 2. First-Time Dashboard Users Welcome Message
+- **Welcome Banner**: A modern glassmorphism banner welcomes new administrators to the Cyan Server Hub.
+- **Quick Actions**: Direct buttons for `+ Build Website`, `+ Provision Database`, `+ New Storage Bucket`, and `+ Universal API Key`.
+- **Dismissible & Persistent**: Users can dismiss the banner at any time; state is saved across sessions in `localStorage`.
+
+### 3. PostgreSQL Database Error Guidance
+- **Missing Binary Detection**: When PostgreSQL is selected on a host lacking `psql`/`createdb`, the modal displays an inline warning banner instead of failing silently or throwing uncaught exceptions.
+- **Zero-Config Guidance**: Explains that SQLite is built-in, serverless, and ready immediately with zero setup.
+- **1-Click Switch**: Features a single-click button to switch to SQLite instantly, plus installation instructions (`winget install PostgreSQL.PostgreSQL` / `apt install postgresql`) if PostgreSQL is specifically desired.
+
+### 4. API Key "Write Only" Permission Scoping
+- **Secure Webhooks & Form Ingestion**: Introduces the `write` permission scope alongside `full` and `read`.
+- **Enforced Security**: Keys with `write` permissions can execute `INSERT`/`UPDATE`/`DELETE` queries and upload bucket files, but are strictly blocked (403 Forbidden) from executing `SELECT` queries or downloading existing files.
+
+### 5. Admin Account Profile & Password Change
+- **Header Profile Trigger**: Clicking the admin avatar in the top-right opens the Admin Profile & Security modal.
+- **Password Management**: Administrators can update their password via `POST /api/auth/change-password` with current password verification and bcrypt hashing.
+
+---
+
 # Cyan Server v0.7.1 Release Notes
 
 **Cyan Server v0.7.1** introduces an interactive numbered CLI menu system, single-command reboot auto-resume (`cyan resume`), startup update checks with self-restart, automated modern default web page generation for newly hosted websites, and critical cross-platform Windows bug fixes.

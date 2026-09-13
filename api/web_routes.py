@@ -125,6 +125,18 @@ async def upload_file(name: str, path: str = Form(""), file: UploadFile = File(.
         raise HTTPException(400, str(e))
 
 
+@router.post("/{name}/files/upload-zip")
+async def upload_site_zip(name: str, path: str = Form(""), file: UploadFile = File(...), _=Depends(require_auth)):
+    """Upload and automatically unpack a zip file into a site's directory."""
+    try:
+        content = await file.read()
+        extracted = web_manager.extract_site_zip(name, content, path)
+        return {"success": True, "filename": file.filename, "extracted_count": len(extracted), "files": extracted}
+    except web_manager.SiteError as e:
+        raise HTTPException(400, str(e))
+
+
+
 class WriteFileRequest(BaseModel):
     path: str
     content: str  # text content — for binary files, use the upload endpoint instead

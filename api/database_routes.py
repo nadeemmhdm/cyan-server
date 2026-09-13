@@ -27,6 +27,25 @@ def list_databases(_=Depends(require_auth)):
     return [_serialize(d) for d in db_manager.list_databases()]
 
 
+@router.get("/engines")
+def get_database_engines(_=Depends(require_auth)):
+    """Check database engines available on this host (SQLite is built-in; PostgreSQL requires host binary)."""
+    pg_avail = db_manager.postgres_available()
+    return {
+        "engines": {
+            "sqlite": True,
+            "postgres": pg_avail,
+        },
+        "details": {
+            "sqlite": {"available": True, "description": "Built-in serverless SQL database (Zero-config, recommended)"},
+            "postgres": {
+                "available": pg_avail,
+                "description": "PostgreSQL relational server (Requires psql/createdb on host)"
+            }
+        }
+    }
+
+
 class CreateDatabaseRequest(BaseModel):
     name: str
     engine: str = "sqlite"

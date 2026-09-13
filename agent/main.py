@@ -186,6 +186,13 @@ def recover_all():
     return {"sites": sites, "applications": applications}
 
 
+@app.post("/api/resume")
+def resume_all():
+    """Single-endpoint reboot survival: restore all sites, reverse proxy domains, and active tunnel routes."""
+    from tunnel.state import resume_all_services
+    return resume_all_services()
+
+
 @app.get("/api/system")
 def system_report():
     """Full one-shot hardware/OS/network snapshot. Real data, not mocked."""

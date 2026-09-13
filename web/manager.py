@@ -439,6 +439,14 @@ def list_sites() -> list[Website]:
         session.close()
 
 
+def get_site(name: str) -> Website | None:
+    session = get_session()
+    try:
+        return session.query(Website).filter_by(name=name).first()
+    finally:
+        session.close()
+
+
 def recover_sites() -> list[dict]:
     """Bring every site that was marked 'running' before the agent last
     stopped back up for real (spec section 20: Automatic Recovery). A site
@@ -549,6 +557,18 @@ def write_site_file(name: str, relative: str, content: bytes) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(content)
 
+    # Also sync into source folder if folder-based
+    try:
+        site = get_site(name)
+        if site and site.source_type == "folder":
+            src_root = Path(site.source).resolve()
+            src_dest = (src_root / relative.lstrip("/")).resolve()
+            if src_root in src_dest.parents or src_dest == src_root:
+                src_dest.parent.mkdir(parents=True, exist_ok=True)
+                src_dest.write_bytes(content)
+    except Exception:
+        pass
+
 
 def delete_site_file(name: str, relative: str) -> None:
     target = _site_safe_path(name, relative)
@@ -558,3 +578,60 @@ def delete_site_file(name: str, relative: str) -> None:
         shutil.rmtree(target)
     else:
         target.unlink()
+
+    # Also delete in source folder if folder-based
+    try:
+        site = get_site(name)
+        if site and site.source_type == "folder":
+            src_root = Path(site.source).resolve()
+            src_dest = (src_root / relative.lstrip("/")).resolve()
+            if (src_root in src_dest.parents or src_dest == src_root) and src_dest.exists():
+                if src_dest.is_dir():
+                    shutil.rmtree(src_dest)
+                else:
+                    src_dest.unlink()
+    except Exception:
+        pass
+
+
+def extract_site_zip(name: str, zip_bytes: bytes, relative_dir: str = "") -> list[str]:
+    """Extract a ZIP archive of website assets (HTML, CSS, JS, etc.) safely into the site folder."""
+    import zipfile
+    import io
+    target_dir = _site_safe_path(name, relative_dir).resolve()
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    src_dir = None
+    try:
+        site = get_site(name)
+        if site and site.source_type == "folder":
+            candidate = (Path(site.source).resolve() / relative_dir.lstrip("/")).resolve()
+            src_root = Path(site.source).resolve()
+            if src_root in candidate.parents or candidate == src_root:
+                src_dir = candidate
+                src_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+    extracted = []
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        for member in zf.infolist():
+            # Defense against Zip Slip path traversal
+            dest = (target_dir / member.filename).resolve()
+            if target_dir not in dest.parents and dest != target_dir:
+                raise SiteError(f"Zip entry '{member.filename}' escapes site directory (traversal rejected)")
+            if member.is_dir():
+                dest.mkdir(parents=True, exist_ok=True)
+                if src_dir:
+                    (src_dir / member.filename).resolve().mkdir(parents=True, exist_ok=True)
+            else:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                data = zf.read(member)
+                dest.write_bytes(data)
+                if src_dir:
+                    src_dest = (src_dir / member.filename).resolve()
+                    src_dest.parent.mkdir(parents=True, exist_ok=True)
+                    src_dest.write_bytes(data)
+                extracted.append(member.filename)
+    return extracted
+

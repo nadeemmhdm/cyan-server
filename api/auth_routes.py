@@ -9,7 +9,7 @@ from security.rate_limit import (
     check_rate_limit, check_lockout, record_failed_login,
     record_successful_login, RateLimitExceeded, AccountLocked,
 )
-from core.database import AuditLog, get_session
+from core.database import AuditLog, User, get_session
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -17,6 +17,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 def _audit(event: str, username: str | None, source_ip: str | None, detail: str = ""):
@@ -57,6 +62,46 @@ def login(req: LoginRequest, request: Request):
     return {"access_token": token, "token_type": "bearer", "role": user.role}
 
 
+@router.get("/me")
+def get_current_user_profile(payload: dict = Depends(require_admin)):
+    """Return profile details for the currently logged in administrator."""
+    session = get_session()
+    try:
+        user = session.query(User).filter_by(username=payload.get("sub")).first()
+        if not user:
+            raise HTTPException(404, "User profile not found")
+        return {
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
+        }
+    finally:
+        session.close()
+
+
+@router.post("/change-password")
+def change_password(req: ChangePasswordRequest, request: Request, payload: dict = Depends(require_admin)):
+    """Change the admin password. Verifies current password and updates hash."""
+    from security.auth import verify_password, hash_password
+    source_ip = request.client.host if request.client else "unknown"
+    session = get_session()
+    try:
+        user = session.query(User).filter_by(username=payload.get("sub")).first()
+        if not user or not verify_password(req.current_password, user.password_hash):
+            _audit("password_change_failed", payload.get("sub"), source_ip, "incorrect current password")
+            raise HTTPException(400, "Current password is incorrect")
+
+        if len(req.new_password) < 6:
+            raise HTTPException(400, "New password must be at least 6 characters long")
+
+        user.password_hash = hash_password(req.new_password)
+        session.commit()
+        _audit("password_change_success", payload.get("sub"), source_ip)
+        return {"success": True, "message": "Password changed successfully"}
+    finally:
+        session.close()
+
+
 @router.get("/audit-log")
 def audit_log(limit: int = 50, _=Depends(require_admin)):
     """Admin-only audit trail of login attempts."""
@@ -69,3 +114,4 @@ def audit_log(limit: int = 50, _=Depends(require_admin)):
         } for r in rows]
     finally:
         session.close()
+

@@ -603,6 +603,136 @@
       background: rgba(34, 211, 238, 0.08);
     }
     .template-card strong { display: block; font-size: 13px; margin-bottom: 2px; color: var(--text); }
+
+    /* WELCOME HERO BANNER */
+    .welcome-banner {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(6, 78, 99, 0.45));
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 24px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(34, 211, 238, 0.06);
+    }
+    .welcome-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(34, 211, 238, 0.15);
+      border: 1px solid var(--border-accent);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .welcome-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .welcome-text {
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 780px;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+    .welcome-quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .btn-close-welcome {
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .btn-close-welcome:hover { color: #fff; }
+
+    /* ALERT BOX */
+    .alert-box {
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      display: flex;
+      gap: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      margin-top: 12px;
+    }
+    .alert-warn {
+      background: rgba(251, 191, 36, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      color: #fef08a;
+    }
+    .alert-warn i { font-size: 20px; color: var(--warn); flex-shrink: 0; margin-top: 1px; }
+
+    /* SOURCE TABS */
+    .source-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .source-tab-btn {
+      padding: 10px 8px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .source-tab-btn.active, .source-tab-btn:hover {
+      background: rgba(34, 211, 238, 0.12);
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    /* FILE DROP ZONE */
+    .file-drop-zone {
+      border: 2px dashed rgba(34, 211, 238, 0.4);
+      border-radius: var(--radius-sm);
+      padding: 24px;
+      text-align: center;
+      background: rgba(6, 11, 20, 0.6);
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .file-drop-zone:hover {
+      border-color: var(--accent);
+      background: rgba(34, 211, 238, 0.06);
+    }
+    .file-drop-zone i { font-size: 32px; color: var(--accent); margin-bottom: 8px; display: block; }
+
+    /* PROFILE MODAL AVATAR */
+    .profile-avatar-large {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 auto 12px auto;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+    }
   </style>
 </head>
 <body>
@@ -639,7 +769,7 @@
       <div>
         <h1>Cyan<span>Server</span></h1>
       </div>
-      <span class="version-tag">v0.7.0</span>
+      <span class="version-tag">v0.7.1</span>
     </a>
 
     <div class="header-right">
@@ -648,10 +778,10 @@
         <span id="header-status-text">Live</span>
       </div>
 
-      <div class="user-pill" id="header-user-badge">
+      <div class="user-pill" id="header-user-badge" onclick="openProfileModal()" title="View Profile & Change Password" style="cursor:pointer">
         <div class="user-avatar" id="avatar-initials">AD</div>
         <span id="header-username" style="font-weight:600">admin</span>
-        <button class="btn-logout" title="Log Out" onclick="handleLogout()"><i class='bx bx-log-out'></i></button>
+        <button class="btn-logout" title="Log Out" onclick="event.stopPropagation(); handleLogout()"><i class='bx bx-log-out'></i></button>
       </div>
     </div>
   </header>
@@ -663,10 +793,26 @@
     <button class="tab-btn" onclick="switchTab('storage')"><i class='bx bx-folder'></i> Storage Buckets</button>
     <button class="tab-btn" onclick="switchTab('apikeys')"><i class='bx bx-key'></i> API Keys</button>
     <button class="tab-btn" onclick="switchTab('websites')"><i class='bx bx-globe'></i> Websites & Apps</button>
+    <button class="tab-btn" onclick="openProfileModal()"><i class='bx bx-user-circle'></i> Profile</button>
   </nav>
 
-  <!-- MAIN -->
   <main>
+
+    <!-- WELCOME HERO BANNER (For first-time users) -->
+    <div id="welcome-banner" class="welcome-banner" style="display:none">
+      <button class="btn-close-welcome" onclick="dismissWelcomeBanner()" title="Dismiss">&times;</button>
+      <div class="welcome-badge"><i class='bx bx-party'></i> Welcome to Cyan Server Hub!</div>
+      <h2 class="welcome-title">Your Local Cloud & Multi-Service Server is Live</h2>
+      <p class="welcome-text">
+        Cyan Server turns this machine into a personal server. Deploy modern websites, provision SQL databases, manage storage buckets with unique IDs, and connect custom domains with automatic live SSL.
+      </p>
+      <div class="welcome-quick-actions">
+        <button class="btn btn-primary" onclick="openBuildWebsiteModal()"><i class='bx bx-globe'></i> Build Website</button>
+        <button class="btn btn-secondary" onclick="openModal('modal-create-db')"><i class='bx bx-data'></i> Provision Database</button>
+        <button class="btn btn-secondary" onclick="openModal('modal-create-bucket')"><i class='bx bx-folder-plus'></i> New Storage Bucket</button>
+        <button class="btn btn-secondary" onclick="openModal('modal-create-key')"><i class='bx bx-key'></i> Universal API Key</button>
+      </div>
+    </div>
 
     <!-- 1. OVERVIEW TAB -->
     <div id="tab-overview" class="tab-content active">
@@ -863,15 +1009,19 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
     <div id="tab-websites" class="tab-content">
       <div class="action-bar">
         <div>
-          <h3 class="section-heading"><i class='bx bx-globe'></i> Hosted Websites</h3>
-          <p style="font-size:13px; color:var(--muted); margin-top:2px">Manage running sites, Caddy domains, and public access.</p>
+          <h3 class="section-heading"><i class='bx bx-globe'></i> Hosted Websites & Applications</h3>
+          <p style="font-size:13px; color:var(--muted); margin-top:2px">Deploy static, React, Node.js, Python, or PHP apps with Caddy SSL domains and public tunnels.</p>
+        </div>
+        <div style="display:flex; gap:10px">
+          <button class="btn btn-secondary" onclick="handleAutoResumeDashboard()"><i class='bx bx-refresh'></i> Auto-Resume All</button>
+          <button class="btn btn-primary" onclick="openBuildWebsiteModal()"><i class='bx bx-plus-circle'></i> Build Website</button>
         </div>
       </div>
 
       <div class="table-container" style="margin-bottom:28px">
         <table id="table-websites">
           <thead>
-            <tr><th>Name</th><th>Type</th><th>Port</th><th>Domain</th><th>Status</th><th>Link</th></tr>
+            <tr><th>Site Name</th><th>Type</th><th>Local Port & URL</th><th>Custom Domain</th><th>Public Tunnel</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody id="tbody-websites"></tbody>
         </table>
@@ -906,10 +1056,21 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
 
         <div class="form-group">
           <label class="form-label">Engine</label>
-          <select id="db-input-engine" class="form-input">
-            <option value="sqlite">SQLite (Always available, zero-config)</option>
-            <option value="postgres">PostgreSQL (Host managed)</option>
+          <select id="db-input-engine" class="form-input" onchange="handleEngineChange()">
+            <option value="sqlite">SQLite (Ready, Zero-config & Serverless - Recommended)</option>
+            <option value="postgres">PostgreSQL (Host Managed)</option>
           </select>
+          <div id="pg-warn-box" class="alert-box alert-warn" style="display:none">
+            <i class='bx bx-error-circle'></i>
+            <div>
+              <strong>PostgreSQL is not installed on this host.</strong>
+              <p style="margin:3px 0">SQLite provides full SQL query capabilities with zero configuration.</p>
+              <div style="margin-top:6px; display:flex; gap:8px; align-items:center">
+                <button type="button" class="btn btn-secondary" style="padding:3px 8px; font-size:11px" onclick="selectDbEngine('sqlite')"><i class='bx bx-check'></i> Switch to SQLite (Recommended)</button>
+                <span style="color:var(--muted); font-size:11px">Install Postgres: <code>winget install PostgreSQL.PostgreSQL</code></span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
@@ -960,15 +1121,249 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
         <div class="form-group">
           <label class="form-label">Permissions</label>
           <select id="key-input-perm" class="form-input">
-            <option value="full">Full Access (Databases & Storage Buckets)</option>
-            <option value="read">Read Only</option>
+            <option value="full">Full Access (Databases & Storage Buckets - Read & Write)</option>
+            <option value="read">Read Only (Queries & File Downloads Only)</option>
+            <option value="write">Write Only (Uploads & Ingestion Only)</option>
           </select>
+          <p style="font-size:12px; color:var(--muted); margin-top:6px"><i class='bx bx-shield-quarter'></i> <strong>Write Only</strong> keys allow external forms or webhooks to insert rows or upload files, but forbid reading existing data.</p>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-key')">Cancel</button>
           <button type="submit" class="btn btn-primary"><i class='bx bx-key'></i> Generate Key</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 4. Build Website Modal -->
+  <div class="modal-overlay" id="modal-build-website">
+    <div class="modal" style="max-width:580px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-globe' style="color:var(--accent)"></i> Build & Deploy Website</h3>
+        <button class="btn-close" onclick="closeModal('modal-build-website')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); handleBuildWebsite();">
+        <div class="form-group">
+          <label class="form-label">Website Name</label>
+          <input type="text" id="site-input-name" class="form-input" placeholder="e.g. my-awesome-site" required oninput="handleSiteNameChange()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Framework / Site Type</label>
+          <select id="site-input-type" class="form-input" onchange="handleSiteTypeChange()">
+            <option value="static">Static HTML/CSS/JS (Instant & Zero-config)</option>
+            <option value="react">React (Build & Serve — Vite / Create-React-App)</option>
+            <option value="node">Node.js (server.js / Express)</option>
+            <option value="python">Python (main.py / FastAPI / Flask)</option>
+            <option value="php">PHP (Built-in Server)</option>
+            <option value="docker">Docker Container</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Source & Starter Content</label>
+          <div class="source-tabs">
+            <div class="source-tab-btn active" id="stab-template" onclick="selectSourceTab('template')"><i class='bx bx-layout'></i> Starter Page</div>
+            <div class="source-tab-btn" id="stab-upload" onclick="selectSourceTab('upload')"><i class='bx bx-upload'></i> Upload Zip</div>
+            <div class="source-tab-btn" id="stab-folder" onclick="selectSourceTab('folder')"><i class='bx bx-folder'></i> Local Folder</div>
+            <div class="source-tab-btn" id="stab-git" onclick="selectSourceTab('git')"><i class='bx bx-git-repo-forked'></i> Git Repo</div>
+          </div>
+
+          <div id="source-sec-template">
+            <p style="font-size:13px; color:var(--muted); margin-bottom:8px">Auto-creates a modern responsive starter template with Outfit/Inter fonts, Boxicons, dark mode, and developer instructions.</p>
+          </div>
+
+          <div id="source-sec-upload" style="display:none">
+            <div class="file-drop-zone" onclick="document.getElementById('site-zip-file-input').click()">
+              <i class='bx bx-cloud-upload'></i>
+              <strong style="display:block; font-size:13px; margin-bottom:4px">Click or Drag & Drop Website ZIP</strong>
+              <span style="font-size:12px; color:var(--muted)">Upload a .zip containing index.html and website assets</span>
+            </div>
+            <input type="file" id="site-zip-file-input" accept=".zip" style="display:none" onchange="handleSiteZipSelected(event)">
+            <div id="site-zip-filename" style="margin-top:6px; font-size:12px; color:var(--accent); font-weight:600"></div>
+          </div>
+
+          <div id="source-sec-folder" style="display:none">
+            <input type="text" id="site-input-folder" class="form-input" placeholder="e.g. ./sites/my-site or C:/projects/my-site">
+          </div>
+
+          <div id="source-sec-git" style="display:none">
+            <input type="text" id="site-input-git" class="form-input" placeholder="https://github.com/username/repository.git">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+          <div class="form-group">
+            <label class="form-label">Local Port</label>
+            <input type="number" id="site-input-port" class="form-input" placeholder="8080" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Custom Domain (Optional)</label>
+            <input type="text" id="site-input-domain" class="form-input" placeholder="e.g. app.mybrand.com">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:4px">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer">
+            <input type="checkbox" id="site-input-deploy" checked style="accent-color:var(--accent)">
+            Deploy website immediately upon creation
+          </label>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-build-website')">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-site"><i class='bx bx-rocket'></i> Create & Deploy</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. Connect Domain Modal -->
+  <div class="modal-overlay" id="modal-site-domain">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-globe' style="color:var(--accent)"></i> Connect Custom Domain</h3>
+        <button class="btn-close" onclick="closeModal('modal-site-domain')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); handleSaveSiteDomain();">
+        <input type="hidden" id="domain-site-name">
+        <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+          Connect your custom domain or subdomain to <strong id="domain-target-site" style="color:var(--text)"></strong>. Cyan Server configures Caddy reverse proxy with automatic live SSL reload.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Domain or Subdomain</label>
+          <input type="text" id="domain-input-val" class="form-input" placeholder="e.g. mysite.com or app.mysite.com">
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:22px">
+          <button type="button" class="btn btn-danger" style="padding:8px 12px; font-size:12px" onclick="handleClearSiteDomain()"><i class='bx bx-trash'></i> Clear Domain</button>
+          <div style="display:flex; gap:10px">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-site-domain')">Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class='bx bx-check'></i> Save & Reload SSL</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. Connect Tunnel Modal -->
+  <div class="modal-overlay" id="modal-site-tunnel">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-radar' style="color:var(--accent2)"></i> Connect Public Tunnel</h3>
+        <button class="btn-close" onclick="closeModal('modal-site-tunnel')">&times;</button>
+      </div>
+      <form onsubmit="event.preventDefault(); handleConnectSiteTunnel();">
+        <input type="hidden" id="tunnel-site-name">
+        <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+          Expose <strong id="tunnel-target-site" style="color:var(--text)"></strong> securely to the internet. Routes are automatically remembered for reboot survival.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Tunnel Provider</label>
+          <select id="tunnel-input-provider" class="form-input" onchange="handleTunnelProviderChange()">
+            <option value="cloudflare">Cloudflare Tunnel (Custom Domains, Zero-trust)</option>
+            <option value="ngrok">ngrok (Instant Public URL)</option>
+          </select>
+        </div>
+        <div class="form-group" id="group-cf-tunnel">
+          <label class="form-label">Cloudflare Tunnel Name</label>
+          <input type="text" id="tunnel-input-name" class="form-input" placeholder="e.g. cyan-tunnel">
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="lbl-tunnel-hostname">Public Hostname</label>
+          <input type="text" id="tunnel-input-hostname" class="form-input" placeholder="e.g. site.mybrand.com">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-site-tunnel')">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class='bx bx-link'></i> Connect Tunnel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 7. Site Files & Uploader Modal -->
+  <div class="modal-overlay" id="modal-site-files">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-folder' style="color:var(--accent)"></i> Site Files: <span id="files-target-site"></span></h3>
+        <button class="btn-close" onclick="closeModal('modal-site-files')">&times;</button>
+      </div>
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+          <div style="font-size:13px; color:var(--muted)">Browse and upload files for this hosted site.</div>
+          <div style="display:flex; gap:8px">
+            <button class="btn btn-secondary" style="padding:6px 12px; font-size:12px" onclick="document.getElementById('site-upload-file-input').click()"><i class='bx bx-upload'></i> Upload File</button>
+            <button class="btn btn-primary" style="padding:6px 12px; font-size:12px" onclick="document.getElementById('site-upload-zip-input').click()"><i class='bx bx-archive-in'></i> Upload Zip (Unpack)</button>
+            <input type="file" id="site-upload-file-input" style="display:none" onchange="handleUploadFileToSite(event)">
+            <input type="file" id="site-upload-zip-input" accept=".zip" style="display:none" onchange="handleUploadZipToSite(event)">
+          </div>
+        </div>
+
+        <div class="table-container" style="max-height:300px; overflow-y:auto">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Size</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="tbody-site-files"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Site Logs Modal -->
+  <div class="modal-overlay" id="modal-site-logs">
+    <div class="modal" style="max-width:700px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-terminal' style="color:var(--accent)"></i> Live Logs: <span id="logs-target-site"></span></h3>
+        <button class="btn-close" onclick="closeModal('modal-site-logs')">&times;</button>
+      </div>
+      <div>
+        <pre id="site-logs-pre" style="background:#030712; border:1px solid var(--border); border-radius:8px; padding:14px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#38bdf8; max-height:360px; overflow-y:auto; white-space:pre-wrap"></pre>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px">
+          <button type="button" class="btn btn-secondary" onclick="refreshSiteLogs()"><i class='bx bx-refresh'></i> Refresh</button>
+          <button type="button" class="btn btn-primary" onclick="closeModal('modal-site-logs')">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 9. Admin Profile & Security Modal -->
+  <div class="modal-overlay" id="modal-profile">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class='bx bx-user-circle' style="color:var(--accent)"></i> Admin Profile & Security</h3>
+        <button class="btn-close" onclick="closeModal('modal-profile')">&times;</button>
+      </div>
+      <div>
+        <div class="profile-avatar-large" id="profile-avatar">AD</div>
+        <h3 style="text-align:center; font-size:18px; margin-bottom:4px" id="profile-name">admin</h3>
+        <p style="text-align:center; font-size:12px; color:var(--muted); margin-bottom:20px"><span class="badge badge-ok">Administrator</span> • Full Cluster & Node Access</p>
+
+        <div style="border-top:1px solid var(--border); padding-top:18px">
+          <h4 style="font-size:14px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:6px">
+            <i class='bx bx-lock-alt' style="color:var(--accent)"></i> Change Password
+          </h4>
+          <form onsubmit="event.preventDefault(); handleChangePassword();">
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <input type="password" id="pwd-input-current" class="form-input" placeholder="Current admin password" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <input type="password" id="pwd-input-new" class="form-input" placeholder="New password (min 6 characters)" required minlength="6">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm New Password</label>
+              <input type="password" id="pwd-input-confirm" class="form-input" placeholder="Confirm new password" required minlength="6">
+            </div>
+            <div id="pwd-status-msg" style="font-size:13px; margin-bottom:10px"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px">
+              <button type="button" class="btn btn-secondary" onclick="closeModal('modal-profile')">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="btn-save-password"><i class='bx bx-save'></i> Update Password</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1128,7 +1523,50 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       } catch (e) {}
     }
 
-    // DATABASES
+    // WELCOME BANNER
+    function checkWelcomeBanner() {
+      const banner = document.getElementById("welcome-banner");
+      if (!banner) return;
+      if (localStorage.getItem("cyan_welcome_dismissed") === "true") {
+        banner.style.display = "none";
+      } else {
+        banner.style.display = "block";
+      }
+    }
+
+    function dismissWelcomeBanner() {
+      localStorage.setItem("cyan_welcome_dismissed", "true");
+      const banner = document.getElementById("welcome-banner");
+      if (banner) banner.style.display = "none";
+    }
+
+    // DATABASES & ENGINES
+    let DB_ENGINES = { sqlite: true, postgres: false };
+
+    async function loadDbEngines() {
+      try {
+        const res = await fetch(AGENT + "/api/database/engines", { headers: authHeaders() }).then(r => r.json());
+        if (res && res.engines) {
+          DB_ENGINES = res.engines;
+        }
+      } catch (e) {}
+    }
+
+    function handleEngineChange() {
+      const engine = document.getElementById("db-input-engine").value;
+      const warnBox = document.getElementById("pg-warn-box");
+      if (engine === "postgres" && !DB_ENGINES.postgres) {
+        warnBox.style.display = "flex";
+      } else {
+        warnBox.style.display = "none";
+      }
+    }
+
+    function selectDbEngine(engine) {
+      document.getElementById("db-input-engine").value = engine;
+      handleEngineChange();
+    }
+
     async function loadDatabases() {
       if (!AUTH_TOKEN) return;
       try {
@@ -1396,7 +1834,7 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
               </code>
               <button class="btn btn-secondary" style="padding:2px 6px; font-size:10px; margin-left:6px" onclick="navigator.clipboard.writeText('${k.key}'); alert('API Key copied to clipboard!')"><i class='bx bx-copy'></i> Copy</button>
             </td>
-            <td><span class="badge badge-ok">${k.permissions}</span></td>
+            <td><span class="badge ${k.permissions === 'write' ? 'badge-warn' : (k.permissions === 'read' ? 'badge-ok' : 'badge-ok')}">${k.permissions}</span></td>
             <td><span style="font-size:12px; color:var(--muted)">${k.last_used_at ? k.last_used_at.slice(0, 19).replace('T', ' ') : 'Never'}</span></td>
             <td>
               <button class="btn btn-danger" style="padding:4px 8px; font-size:11px" onclick="handleRevokeKey('${k.id}')"><i class='bx bx-x-circle'></i> Revoke</button>
@@ -1436,29 +1874,552 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
       } catch (err) { alert("Failed to revoke key"); }
     }
 
-    // WEBSITES & APPS
+    // WEBSITES & APPS BUILDER
+    let selectedSiteZipFile = null;
+    let currentActiveSiteName = null;
+    let currentLogsSite = null;
+
     async function loadWebsites() {
       if (!AUTH_TOKEN) return;
       try {
         const sites = await fetch(AGENT + "/api/web", { headers: authHeaders() }).then(r => r.json());
         const tbody = document.getElementById("tbody-websites");
         if (!sites || sites.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><i class='bx bx-globe'></i>No websites created yet. Deploy sites with <code>cyan web create</code>.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><i class='bx bx-globe'></i>No websites created yet. Click "+ Build Website" to build & host your first site.</td></tr>`;
           return;
         }
-        tbody.innerHTML = sites.map(s => `
-          <tr>
-            <td><strong>${s.name}</strong></td>
-            <td><span class="badge badge-ok">${s.site_type}</span></td>
-            <td><code>${s.port}</code></td>
-            <td>${s.domain || "—"}</td>
-            <td><span class="badge ${s.status === 'running' ? 'badge-ok' : 'badge-danger'}">${s.status}</span></td>
-            <td><a href="http://${location.hostname}:${s.port}" target="_blank" style="color:var(--accent); text-decoration:none; font-weight:600"><i class='bx bx-link-external'></i> Open</a></td>
-          </tr>
-        `).join("");
+        tbody.innerHTML = sites.map(s => {
+          const isRunning = s.status === 'running';
+          const domainDisplay = s.domain 
+            ? `<span style="font-weight:600; color:var(--accent); display:inline-flex; align-items:center; gap:4px"><i class='bx bx-check-shield' style="color:var(--accent2)"></i> ${s.domain}</span>` 
+            : `<span style="color:var(--muted)">None</span>`;
+
+          return `
+            <tr>
+              <td><strong><i class='bx bx-window-alt' style="color:var(--accent); margin-right:6px"></i>${s.name}</strong></td>
+              <td><span class="badge badge-ok">${s.site_type}</span></td>
+              <td><code>${s.port}</code></td>
+              <td>${domainDisplay}</td>
+              <td>
+                <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="openSiteTunnelModal('${s.name}', ${s.port})">
+                  <i class='bx bx-broadcast'></i> Connect
+                </button>
+              </td>
+              <td><span class="badge ${isRunning ? 'badge-ok' : 'badge-danger'}">${s.status}</span></td>
+              <td>
+                <div style="display:flex; gap:4px; flex-wrap:wrap">
+                  ${isRunning ? `
+                    <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="toggleDeploySite('${s.name}', 'running')" title="Stop Site"><i class='bx bx-stop'></i> Stop</button>
+                    <a class="btn btn-secondary" style="padding:3px 7px; font-size:11px; text-decoration:none" href="http://${location.hostname}:${s.port}" target="_blank" title="Browse Site"><i class='bx bx-link-external'></i> Open</a>
+                  ` : `
+                    <button class="btn btn-primary" style="padding:3px 7px; font-size:11px" onclick="toggleDeploySite('${s.name}', 'stopped')" title="Start Site"><i class='bx bx-play'></i> Start</button>
+                  `}
+                  <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="openSiteDomainModal('${s.name}', '${s.domain || ''}')" title="Custom Domain"><i class='bx bx-globe'></i> Domain</button>
+                  <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="openSiteFilesModal('${s.name}')" title="Browse / Upload Files"><i class='bx bx-folder'></i> Files</button>
+                  <button class="btn btn-secondary" style="padding:3px 7px; font-size:11px" onclick="openSiteLogsModal('${s.name}')" title="View Logs"><i class='bx bx-terminal'></i> Logs</button>
+                  <button class="btn btn-danger" style="padding:3px 7px; font-size:11px" onclick="handleDeleteSite('${s.name}')" title="Delete Website"><i class='bx bx-trash'></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join("");
       } catch (err) {}
     }
 
+    async function openBuildWebsiteModal() {
+      let nextPort = 8080;
+      try {
+        const sites = await fetch(AGENT + "/api/web", { headers: authHeaders() }).then(r => r.json());
+        if (sites && sites.length > 0) {
+          const ports = sites.map(s => s.port).filter(p => !isNaN(p));
+          if (ports.length > 0) {
+            nextPort = Math.max(...ports) + 1;
+          }
+        }
+      } catch (e) {}
+
+      document.getElementById("site-input-name").value = "";
+      document.getElementById("site-input-type").value = "static";
+      document.getElementById("site-input-port").value = nextPort;
+      document.getElementById("site-input-domain").value = "";
+      document.getElementById("site-input-folder").value = "";
+      document.getElementById("site-input-git").value = "";
+      document.getElementById("site-input-deploy").checked = true;
+      selectedSiteZipFile = null;
+      document.getElementById("site-zip-filename").textContent = "";
+      document.getElementById("site-zip-file-input").value = "";
+      selectSourceTab("template");
+
+      openModal("modal-build-website");
+    }
+
+    function handleSiteNameChange() {
+      const name = document.getElementById("site-input-name").value.trim();
+      const folderInput = document.getElementById("site-input-folder");
+      if (!folderInput.value || folderInput.value.startsWith("./sites/")) {
+        folderInput.value = name ? `./sites/${name}` : "";
+      }
+    }
+
+    function handleSiteTypeChange() {
+      const type = document.getElementById("site-input-type").value;
+      const portInput = document.getElementById("site-input-port");
+      if (type === "node" && portInput.value === "8080") portInput.value = "3000";
+      if (type === "react" && portInput.value === "8080") portInput.value = "5173";
+      if (type === "python" && portInput.value === "8080") portInput.value = "8000";
+    }
+
+    function selectSourceTab(tab) {
+      const tabs = ["template", "upload", "folder", "git"];
+      tabs.forEach(t => {
+        const btn = document.getElementById("stab-" + t);
+        const sec = document.getElementById("source-sec-" + t);
+        if (btn) btn.classList.toggle("active", t === tab);
+        if (sec) sec.style.display = (t === tab) ? "block" : "none";
+      });
+    }
+
+    function handleSiteZipSelected(e) {
+      const file = e.target.files[0];
+      if (file) {
+        selectedSiteZipFile = file;
+        document.getElementById("site-zip-filename").innerHTML = `<i class='bx bx-check-circle'></i> Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      }
+    }
+
+    async function handleBuildWebsite() {
+      const name = document.getElementById("site-input-name").value.trim();
+      const siteType = document.getElementById("site-input-type").value;
+      const port = parseInt(document.getElementById("site-input-port").value, 10);
+      const domain = document.getElementById("site-input-domain").value.trim() || null;
+      const deploy = document.getElementById("site-input-deploy").checked;
+      const activeTab = document.querySelector(".source-tab-btn.active")?.id?.replace("stab-", "") || "template";
+
+      let sourceType = "folder";
+      let source = "";
+
+      if (activeTab === "folder") {
+        sourceType = "folder";
+        source = document.getElementById("site-input-folder").value.trim() || ("./sites/" + name);
+      } else if (activeTab === "git") {
+        sourceType = "git";
+        source = document.getElementById("site-input-git").value.trim();
+        if (!source) {
+          alert("Please provide a valid Git repository URL");
+          return;
+        }
+      } else {
+        sourceType = "folder";
+        source = "./sites/" + name;
+      }
+
+      const btn = document.getElementById("btn-submit-site");
+      btn.disabled = true;
+      btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Creating Site…";
+
+      try {
+        const res = await fetch(AGENT + "/api/web", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            site_type: siteType,
+            source_type: sourceType,
+            source,
+            port,
+            domain,
+            env_vars: {}
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Error creating site: " + (err.detail || "Request failed"));
+          btn.disabled = false;
+          btn.innerHTML = "<i class='bx bx-rocket'></i> Create & Deploy";
+          return;
+        }
+
+        if (activeTab === "upload" && selectedSiteZipFile) {
+          btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Extracting ZIP…";
+          const fd = new FormData();
+          fd.append("file", selectedSiteZipFile);
+          const zipRes = await fetch(AGENT + `/api/web/${name}/files/upload-zip`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: fd
+          });
+          if (!zipRes.ok) {
+            const zipErr = await zipRes.json();
+            alert("Site created, but ZIP extraction encountered an issue: " + (zipErr.detail || "Check file"));
+          }
+        }
+
+        if (deploy) {
+          btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Deploying…";
+          await fetch(AGENT + `/api/web/${name}/deploy`, {
+            method: "POST",
+            headers: authHeaders()
+          });
+        }
+
+        closeModal("modal-build-website");
+        loadWebsites();
+      } catch (e) {
+        alert("Connection error: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<i class='bx bx-rocket'></i> Create & Deploy";
+      }
+    }
+
+    async function toggleDeploySite(name, currentStatus) {
+      const endpoint = currentStatus === "running" ? `/api/web/${name}/stop` : `/api/web/${name}/deploy`;
+      try {
+        const res = await fetch(AGENT + endpoint, { method: "POST", headers: authHeaders() });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Action failed: " + (err.detail || "Server error"));
+        }
+        loadWebsites();
+      } catch (e) { alert("Failed to connect to agent"); }
+    }
+
+    async function handleDeleteSite(name) {
+      if (!confirm(`Are you sure you want to delete website "${name}"?`)) return;
+      try {
+        const res = await fetch(AGENT + `/api/web/${name}?permanent=true`, { method: "DELETE", headers: authHeaders() });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Delete failed: " + (err.detail || "Error"));
+        }
+        loadWebsites();
+      } catch (e) { alert("Delete request failed"); }
+    }
+
+    // CUSTOM DOMAIN MODAL HANDLERS
+    function openSiteDomainModal(name, domain) {
+      document.getElementById("domain-site-name").value = name;
+      document.getElementById("domain-target-site").textContent = name;
+      document.getElementById("domain-input-val").value = domain || "";
+      openModal("modal-site-domain");
+    }
+
+    async function handleSaveSiteDomain() {
+      const name = document.getElementById("domain-site-name").value;
+      const domain = document.getElementById("domain-input-val").value.trim() || null;
+      try {
+        const res = await fetch(AGENT + `/api/web/${name}/domain`, {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ domain })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Error configuring domain: " + (err.detail || "Failed"));
+          return;
+        }
+        closeModal("modal-site-domain");
+        loadWebsites();
+        alert(`Domain successfully configured for ${name}!\nCaddy reverse proxy reloaded with automatic live SSL.`);
+      } catch (e) { alert("Connection failed: " + e.message); }
+    }
+
+    async function handleClearSiteDomain() {
+      const name = document.getElementById("domain-site-name").value;
+      if (!confirm(`Remove custom domain from site "${name}"?`)) return;
+      try {
+        await fetch(AGENT + `/api/web/${name}/domain`, {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ domain: null })
+        });
+        closeModal("modal-site-domain");
+        loadWebsites();
+      } catch (e) { alert("Failed to clear domain"); }
+    }
+
+    // TUNNEL MODAL HANDLERS
+    function openSiteTunnelModal(name, port) {
+      document.getElementById("tunnel-site-name").value = name;
+      document.getElementById("tunnel-target-site").textContent = name;
+      document.getElementById("tunnel-target-port").textContent = port;
+      document.getElementById("tunnel-cf-name").value = name + "-tunnel";
+      document.getElementById("tunnel-cf-hostname").value = name + ".mydomain.com";
+      document.getElementById("tunnel-ngrok-domain").value = "";
+      selectTunnelProvider("cloudflare");
+      openModal("modal-site-tunnel");
+    }
+
+    function selectTunnelProvider(provider) {
+      const cfSec = document.getElementById("tunnel-sec-cloudflare");
+      const ngSec = document.getElementById("tunnel-sec-ngrok");
+      const cfBtn = document.getElementById("tbtn-cf");
+      const ngBtn = document.getElementById("tbtn-ngrok");
+      if (provider === "cloudflare") {
+        cfSec.style.display = "block";
+        ngSec.style.display = "none";
+        cfBtn.className = "btn btn-primary";
+        ngBtn.className = "btn btn-secondary";
+      } else {
+        cfSec.style.display = "none";
+        ngSec.style.display = "block";
+        ngBtn.className = "btn btn-primary";
+        cfBtn.className = "btn btn-secondary";
+      }
+    }
+
+    async function handleConnectSiteTunnel() {
+      const name = document.getElementById("tunnel-site-name").value;
+      const isCf = document.getElementById("tunnel-sec-cloudflare").style.display !== "none";
+      const btn = document.getElementById("btn-submit-tunnel");
+      btn.disabled = true;
+      btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Connecting…";
+
+      try {
+        if (isCf) {
+          const tunnelName = document.getElementById("tunnel-cf-name").value.trim();
+          const hostname = document.getElementById("tunnel-cf-hostname").value.trim();
+          if (!tunnelName || !hostname) {
+            alert("Please enter both tunnel name and hostname");
+            btn.disabled = false;
+            btn.innerHTML = "<i class='bx bx-broadcast'></i> Connect Tunnel";
+            return;
+          }
+          const res = await fetch(AGENT + "/api/tunnel-connect/cloudflare", {
+            method: "POST",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ site_name: name, hostname, tunnel_name: tunnelName })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            alert("Cloudflare tunnel error: " + (data.detail || "Check cloudflared installation"));
+          } else {
+            alert(`✓ Cloudflare Tunnel Connected!\nHostname: ${hostname}\nRoute saved for automatic reboot recovery.`);
+            closeModal("modal-site-tunnel");
+          }
+        } else {
+          const hostname = document.getElementById("tunnel-ngrok-domain").value.trim() || null;
+          const res = await fetch(AGENT + "/api/tunnel-connect/ngrok", {
+            method: "POST",
+            headers: { ...authHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ site_name: name, hostname })
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            alert("Ngrok tunnel error: " + (data.detail || "Check ngrok installation and authtoken"));
+          } else {
+            alert(`✓ Ngrok Tunnel Connected!\nPublic URL: ${data.public_url || "Active"}`);
+            closeModal("modal-site-tunnel");
+          }
+        }
+      } catch (e) {
+        alert("Connection error: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<i class='bx bx-broadcast'></i> Connect Tunnel";
+      }
+    }
+
+    // SITE FILES MODAL HANDLERS
+    function openSiteFilesModal(name) {
+      currentActiveSiteName = name;
+      document.getElementById("files-site-name").textContent = name;
+      loadSiteFiles(name);
+      openModal("modal-site-files");
+    }
+
+    async function loadSiteFiles(name) {
+      if (!name) name = currentActiveSiteName;
+      const tbody = document.getElementById("tbody-site-files");
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px; color:var(--muted)"><i class='bx bx-loader-alt bx-spin'></i> Loading files…</td></tr>`;
+
+      try {
+        const res = await fetch(AGENT + `/api/web/${name}/files`, { headers: authHeaders() }).then(r => r.json());
+        const entries = res.entries || [];
+        if (entries.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" class="empty-state"><i class='bx bx-folder-open'></i>No files found in site folder. Upload files or a ZIP archive above.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = entries.map(e => `
+          <tr>
+            <td><strong><i class='bx ${e.is_dir ? "bx-folder text-accent" : "bx-file"}' style="margin-right:6px"></i>${e.name}</strong></td>
+            <td><code>${e.is_dir ? 'DIR' : (e.size_bytes / 1024).toFixed(1) + ' KB'}</code></td>
+            <td><span style="font-size:12px; color:var(--muted)">${e.modified ? e.modified.slice(0, 19).replace('T', ' ') : '—'}</span></td>
+            <td>
+              <div style="display:flex; gap:6px">
+                ${!e.is_dir ? `<a class="btn btn-secondary" style="padding:3px 7px; font-size:11px; text-decoration:none" href="${AGENT}/api/web/${name}/files/download?path=${encodeURIComponent(e.name)}" target="_blank"><i class='bx bx-download'></i></a>` : ''}
+                <button class="btn btn-danger" style="padding:3px 7px; font-size:11px" onclick="handleDeleteSiteFile('${name}', '${e.name}')"><i class='bx bx-trash'></i></button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state" style="color:var(--danger)">Failed to load files: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function handleUploadFileToSite(e) {
+      const file = e.target.files[0];
+      if (!file || !currentActiveSiteName) return;
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch(AGENT + `/api/web/${currentActiveSiteName}/files/upload`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: fd
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert("Upload failed: " + (err.detail || "Server error"));
+          return;
+        }
+        loadSiteFiles(currentActiveSiteName);
+      } catch (e) { alert("Upload failed: " + e.message); }
+    }
+
+    async function handleUploadZipToSite(e) {
+      const file = e.target.files[0];
+      if (!file || !currentActiveSiteName) return;
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch(AGENT + `/api/web/${currentActiveSiteName}/files/upload-zip`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: fd
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert("ZIP extraction failed: " + (data.detail || "Server error"));
+          return;
+        }
+        alert(`✓ ZIP Unpacked! Extracted ${data.extracted_count} file(s) into website folder.`);
+        loadSiteFiles(currentActiveSiteName);
+      } catch (e) { alert("ZIP upload failed: " + e.message); }
+    }
+
+    async function handleDeleteSiteFile(name, filename) {
+      if (!confirm(`Delete "${filename}" from website?`)) return;
+      try {
+        await fetch(AGENT + `/api/web/${name}/files?path=${encodeURIComponent(filename)}`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        loadSiteFiles(name);
+      } catch (e) { alert("Failed to delete file"); }
+    }
+
+    // SITE LOGS MODAL HANDLERS
+    function openSiteLogsModal(name) {
+      currentLogsSite = name;
+      document.getElementById("logs-site-name").textContent = name;
+      openModal("modal-site-logs");
+      refreshSiteLogs();
+    }
+
+    async function refreshSiteLogs() {
+      if (!currentLogsSite) return;
+      const pre = document.getElementById("site-logs-pre");
+      pre.textContent = "Fetching latest logs…";
+      try {
+        const res = await fetch(AGENT + `/api/web/${currentLogsSite}/logs?lines=100`, { headers: authHeaders() }).then(r => r.json());
+        pre.textContent = res.logs || "(No log output recorded yet)";
+      } catch (e) {
+        pre.textContent = "Failed to fetch logs: " + e.message;
+      }
+    }
+
+    // ADMIN PROFILE & PASSWORD CHANGE
+    async function openProfileModal() {
+      try {
+        const me = await fetch(AGENT + "/api/auth/me", { headers: authHeaders() }).then(r => r.json());
+        if (me.username) {
+          document.getElementById("profile-name").textContent = me.username;
+          document.getElementById("profile-avatar").textContent = me.username.slice(0, 2).toUpperCase();
+        }
+      } catch (e) {}
+      document.getElementById("pwd-input-current").value = "";
+      document.getElementById("pwd-input-new").value = "";
+      document.getElementById("pwd-input-confirm").value = "";
+      document.getElementById("pwd-status-msg").textContent = "";
+      openModal("modal-profile");
+    }
+
+    async function handleChangePassword() {
+      const current = document.getElementById("pwd-input-current").value;
+      const newPwd = document.getElementById("pwd-input-new").value;
+      const confirmPwd = document.getElementById("pwd-input-confirm").value;
+      const statusMsg = document.getElementById("pwd-status-msg");
+      const btn = document.getElementById("btn-save-password");
+
+      if (newPwd !== confirmPwd) {
+        statusMsg.textContent = "New password and confirmation do not match.";
+        statusMsg.style.color = "var(--danger)";
+        return;
+      }
+      if (newPwd.length < 6) {
+        statusMsg.textContent = "New password must be at least 6 characters long.";
+        statusMsg.style.color = "var(--danger)";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Updating…";
+      statusMsg.textContent = "";
+
+      try {
+        const res = await fetch(AGENT + "/api/auth/change-password", {
+          method: "POST",
+          headers: { ...authHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({ current_password: current, new_password: newPwd })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          statusMsg.textContent = data.detail || "Failed to update password.";
+          statusMsg.style.color = "var(--danger)";
+        } else {
+          statusMsg.textContent = "Password updated successfully!";
+          statusMsg.style.color = "var(--accent2)";
+          document.getElementById("pwd-input-current").value = "";
+          document.getElementById("pwd-input-new").value = "";
+          document.getElementById("pwd-input-confirm").value = "";
+          setTimeout(() => {
+            closeModal("modal-profile");
+          }, 1200);
+        }
+      } catch (e) {
+        statusMsg.textContent = "Server error: " + e.message;
+        statusMsg.style.color = "var(--danger)";
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = "<i class='bx bx-save'></i> Update Password";
+      }
+    }
+
+    // AUTO-RESUME ALL
+    async function handleAutoResumeDashboard() {
+      const btn = event?.currentTarget;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Restoring…";
+      }
+      try {
+        const res = await fetch(AGENT + "/api/resume", { method: "POST", headers: authHeaders() }).then(r => r.json());
+        alert(`✓ Auto-Resume Executed!\n\nAll websites, reverse proxy domains, and saved tunnel routes have been restored.`);
+        loadAllData();
+      } catch (e) {
+        alert("Auto-resume failed: " + e.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = "<i class='bx bx-refresh'></i> Auto-Resume All";
+        }
+      }
+    }
+
+    // CLOUDFLARE
     async function loadCloudflare() {
       try {
         const avail = await fetch(AGENT + "/api/cloudflare/available").then(r => r.json());
@@ -1489,6 +2450,8 @@ curl -X POST http://localhost:7331/api/v1/storage/&lt;YOUR_BUCKET_ID&gt;/upload 
     }
 
     function loadAllData() {
+      checkWelcomeBanner();
+      loadDbEngines();
       pollLiveMetrics();
       loadSystem();
       loadDatabases();

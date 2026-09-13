@@ -60,5 +60,12 @@ def require_auth_or_api_key(
     """Accepts either JWT session auth (from Dashboard/CLI) or an API key (external apps)."""
     if x_api_key or (authorization and "cyan_live_" in authorization):
         api_key = require_api_key(x_api_key=x_api_key, authorization=authorization)
-        return {"sub": f"api_key:{api_key.name}", "role": "api_user", "api_key_id": api_key.id}
-    return require_auth(authorization=authorization)
+        return {
+            "sub": f"api_key:{api_key.name}",
+            "role": "api_user",
+            "api_key_id": api_key.id,
+            "permissions": api_key.permissions or "full",
+        }
+    auth_dict = require_auth(authorization=authorization)
+    auth_dict["permissions"] = "full"
+    return auth_dict
