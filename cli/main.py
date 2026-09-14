@@ -1200,6 +1200,101 @@ def resume():
     run_auto_resume()
 
 
+# --- Auth Service: email+password auth as a feature, scoped by project ------
+
+auth_svc_app = typer.Typer(help="Email+password authentication as a feature — "
+                                 "projects, SMTP, and email templates.")
+app.add_typer(auth_svc_app, name="auth")
+
+
+@auth_svc_app.command("project-create")
+def authsvc_project_create(name: str, description: str = typer.Option("", "--description")):
+    """Create a project. Prints the API key ONCE — copy it now, it can't be shown again."""
+    result = _agent_post("/api/authsvc/projects", {"name": name, "description": description}, auth=True)
+    console.print(f"[green]✓ Project created:[/green] {result['project_id']}")
+    console.print(f"[bold yellow]API key (save this now — shown only once):[/bold yellow] {result['api_key']}")
+
+
+@auth_svc_app.command("project-list")
+def authsvc_project_list():
+    """List all auth projects."""
+    projects = _agent_get("/api/authsvc/projects", auth=True)
+    if not projects:
+        console.print("[yellow]No auth projects yet.[/yellow] Run: [bold]cyan auth project-create <name>[/bold]")
+        return
+    table = Table(title="Auth Service Projects", border_style="cyan")
+    for col in ("Project ID", "Name", "API Key", "SMTP", "Verify email?", "Min pw len", "Max attempts", "Lockout (min)"):
+        table.add_column(col)
+    for p in projects:
+        table.add_row(p["project_id"], p["name"], p["api_key_prefix"],
+                       "✓" if p["smtp_configured"] else "✗",
+                       "✓" if p["require_email_verification"] else "✗",
+                       str(p["password_min_length"]), str(p["max_login_attempts"]),
+                       str(p["lockout_minutes"]))
+    console.print(table)
+
+
+@auth_svc_app.command("smtp")
+def authsvc_smtp(project_id: str, host: str = typer.Option(..., "--host"),
+                  port: int = typer.Option(..., "--port"),
+                  email: str = typer.Option(..., "--email"),
+                  app_password: str = typer.Option(..., "--app-password", prompt=True, hide_input=True),
+                  use_tls: bool = typer.Option(True, "--use-tls/--no-tls"),
+                  from_name: str = typer.Option("Cyan Server", "--from-name")):
+    """Configure SMTP for a project — collected only when you actually use this
+    feature, and verified with a real login before it's saved."""
+    try:
+        result = _agent_post(f"/api/authsvc/projects/{project_id}/smtp", {
+            "host": host, "port": port, "email": email, "app_password": app_password,
+            "use_tls": use_tls, "from_name": from_name, "verify": True,
+        }, auth=True)
+        console.print(f"[green]✓ SMTP configured and verified for '{project_id}'[/green]")
+    except Exception as e:
+        console.print(f"[red]✗ {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@auth_svc_app.command("policy")
+def authsvc_policy(project_id: str,
+                    require_email_verification: bool = typer.Option(None, "--require-verification/--no-require-verification"),
+                    password_min_length: int = typer.Option(None, "--password-min-length"),
+                    max_login_attempts: int = typer.Option(None, "--max-login-attempts"),
+                    lockout_minutes: int = typer.Option(None, "--lockout-minutes")):
+    """Update a project's security policy: password length, verification
+    requirement, and attempt-based cooldown/lockout settings."""
+    payload = {k: v for k, v in {
+        "require_email_verification": require_email_verification,
+        "password_min_length": password_min_length,
+        "max_login_attempts": max_login_attempts,
+        "lockout_minutes": lockout_minutes,
+    }.items() if v is not None}
+    _agent_post(f"/api/authsvc/projects/{project_id}/policy", payload, auth=True, method="PUT")
+    console.print(f"[green]✓ Policy updated for '{project_id}'[/green]")
+
+
+@auth_svc_app.command("template-show")
+def authsvc_template_show(project_id: str):
+    """Show the current email templates (verify_email, password_reset) for a project."""
+    templates = _agent_get(f"/api/authsvc/projects/{project_id}/templates", auth=True)
+    for t in templates:
+        console.print(f"\n[bold cyan]{t['template_type']}[/bold cyan]")
+        console.print(f"  Subject: {t['subject']}")
+        console.print(f"  Body: {t['body_html'][:200]}{'...' if len(t['body_html']) > 200 else ''}")
+
+
+@auth_svc_app.command("template-edit")
+def authsvc_template_edit(project_id: str, template_type: str,
+                           subject: str = typer.Option(..., "--subject"),
+                           body_file: str = typer.Option(..., "--body-file",
+                                                          help="Path to an HTML file with the email body. "
+                                                               "Use {{otp}}, {{link}}, {{email}}, {{project_name}}, {{ttl_minutes}}.")):
+    """Edit a project's email template. template_type: email_verify | password_reset"""
+    body_html = Path(body_file).read_text()
+    _agent_post(f"/api/authsvc/projects/{project_id}/templates/{template_type}",
+                {"subject": subject, "body_html": body_html}, auth=True, method="PUT")
+    console.print(f"[green]✓ Template '{template_type}' updated for '{project_id}'[/green]")
+
+
 if __name__ == "__main__":
     app()
 

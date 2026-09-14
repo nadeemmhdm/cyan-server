@@ -42,6 +42,7 @@ from api.ngrok_routes import router as ngrok_router
 from api.tunnel_connect_routes import router as tunnel_connect_router
 from api.apikey_routes import router as apikey_router
 from api.v1_routes import router as v1_router
+from api.authsvc_routes import router as authsvc_router
 
 app = FastAPI(title="Cyan Server Agent", version=VERSION)
 
@@ -66,6 +67,7 @@ app.include_router(ngrok_router)
 app.include_router(tunnel_connect_router)
 app.include_router(apikey_router)
 app.include_router(v1_router)
+app.include_router(authsvc_router)
 
 _START_TIME = time.time()
 

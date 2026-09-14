@@ -22,13 +22,24 @@ disclosure timeline.
 
 | Version | Supported |
 |---|---|
-| 0.9.x   | ✅ |
-| 0.6.x – 0.8.x | ✅ (upgrade recommended — `cyan update`) |
+| 0.10.x  | ✅ |
+| 0.6.x – 0.9.x | ✅ (upgrade recommended — `cyan update`) |
 | < 0.6   | ❌ (upgrade — `cyan update`) |
 
-## Current security posture (v0.9.0)
+## Current security posture (v0.10.0)
 
 - Passwords: bcrypt-hashed, never stored or logged in plaintext.
+- **Auth Service** (project-scoped end-user authentication): passwords
+  follow the same bcrypt hashing and a project-configurable strength
+  policy (length + character classes + common-password denylist); SMTP
+  app passwords for sending verification emails are Fernet-encrypted at
+  rest and verified with a real login attempt before being saved;
+  failed-login lockout is database-backed and progressive (each repeat
+  lockout roughly doubles the cooldown, capped at 24h) rather than a
+  simple fixed window; session tokens use a JWT secret kept entirely
+  separate from the admin dashboard's, so one can never be replayed as
+  the other; login responses are shaped to avoid confirming whether an
+  email is registered.
 - Optional TOTP two-factor authentication per user, on top of the
   password/JWT flow below.
 - Sessions: JWT, 12-hour expiry, signed with a per-install secret generated

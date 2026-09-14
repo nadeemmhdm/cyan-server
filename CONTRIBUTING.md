@@ -35,7 +35,7 @@ python3 cli/main.py login --username admin --password "<from agent output>"
 ## Running tests
 
 ```bash
-pip install pytest pytest-asyncio httpx python-multipart
+pip install pytest pytest-asyncio httpx python-multipart aiosmtpd
 pytest tests/ -q
 ```
 

@@ -18,6 +18,7 @@ logged in first (`cyan login`).
 - [Databases](#databases)
 - [Applications](#applications)
 - [Tunnels](#tunnels)
+- [Auth Service](#auth-service)
 
 ---
 
@@ -396,4 +397,68 @@ Get the current public ngrok URL.
 ```bash
 cyan tunnel url
 cyan tunnel url --port 8080
+```
+
+## Auth Service
+
+Email+password authentication as a feature your own apps/sites can use —
+scoped by **project** and **API key**. Real bcrypt password hashing, real
+SMTP delivery of verification links/OTPs, real password policy, and a
+real database-backed progressive lockout (each repeat lockout doubles
+the cooldown). SMTP details are collected only when you actually
+configure this feature, and are verified with a real login attempt
+before being saved — nothing is stored or sent until that check passes.
+
+### `cyan auth project-create <name> [--description TEXT]`
+Creates a project and prints its API key — **shown exactly once**, copy
+it immediately. Also seeds default email templates.
+```bash
+cyan auth project-create "My App" --description "Auth for my SaaS"
+```
+
+### `cyan auth project-list`
+List every project, its SMTP/verification status, and current policy.
+```bash
+cyan auth project-list
+```
+
+### `cyan auth smtp <project_id> --host H --port P --email E [--use-tls/--no-tls] [--from-name NAME]`
+Configure (or replace) a project's SMTP credentials. Prompts for the
+app password if not piped in; performs a real SMTP login before saving.
+```bash
+cyan auth smtp proj_ab12cd34 --host smtp.gmail.com --port 587 --email sender@example.com
+```
+
+### `cyan auth policy <project_id> [--require-verification/--no-require-verification] [--password-min-length N] [--max-login-attempts N] [--lockout-minutes N]`
+Update a project's security policy — password strength requirement,
+whether email verification is mandatory before login, and the
+attempt-based cooldown thresholds.
+```bash
+cyan auth policy proj_ab12cd34 --password-min-length 12 --max-login-attempts 3 --lockout-minutes 30
+```
+
+### `cyan auth template-show <project_id>`
+Show the current `email_verify` and `password_reset` templates.
+```bash
+cyan auth template-show proj_ab12cd34
+```
+
+### `cyan auth template-edit <project_id> <template_type> --subject "..." --body-file body.html`
+Edit an email template. `template_type`: `email_verify` | `password_reset`.
+Body file can use `{{otp}}`, `{{link}}`, `{{email}}`, `{{project_name}}`, `{{ttl_minutes}}`.
+```bash
+cyan auth template-edit proj_ab12cd34 email_verify --subject "Confirm your account" --body-file verify.html
+```
+
+### API surface (used by your own app, not the Cyan Server admin)
+Everything below takes the project's `api_key`, not an admin login —
+it's what your app's signup/login forms call.
+```
+POST /api/authsvc/register            { api_key, email, password }
+POST /api/authsvc/verify-otp          { api_key, email, otp }
+POST /api/authsvc/verify-email        { token }                    (the link path)
+POST /api/authsvc/resend-verification { api_key, email }
+POST /api/authsvc/login               { api_key, email, password } -> session_token (JWT, 12h)
+POST /api/authsvc/forgot-password     { api_key, email }
+POST /api/authsvc/reset-password      { api_key, email, code, new_password }
 ```

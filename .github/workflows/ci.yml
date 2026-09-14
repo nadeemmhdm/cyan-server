@@ -17,7 +17,7 @@ jobs:
       - name: Install Python deps
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx python-multipart
+          pip install pytest pytest-asyncio httpx python-multipart aiosmtpd
       - name: Run test suite
         run: pytest tests/ -q -k "not test_interactive_cli and not test_v073_features"
         # test_interactive_cli.py and test_v073_features.py are integration

@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.9.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.10.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -86,6 +86,14 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 - **Real hardware/OS detection** — CPU, RAM, disks, network interfaces, Docker, virtualization — on Windows, Linux, and macOS, x86_64 and ARM64
 - **Platform abstraction layer** — package manager, service manager, and network manager adapters per OS (apt/dnf/pacman + systemd on Linux, winget/choco + `sc.exe` on Windows, brew + launchctl on macOS) — the core app never shells out to a hardcoded package manager
 - **One CLI** (`cyan`) and **one dashboard**, served by a single agent process, for everything below
+
+### Auth Service — email+password auth as a feature
+- Add real user authentication to your own app or site: create a **project**, get a **project ID + API key**, point your signup/login forms at it
+- Email verification via both a link and a 6-digit OTP; password reset the same way
+- SMTP is collected only when you configure this feature, and is **verified with a real login attempt** before being saved — nothing sends until that check passes
+- Real password policy (length, character classes, common-password denylist), real bcrypt hashing, and a **database-backed progressive lockout** (each repeat lockout doubles the cooldown) — not just an in-memory rate limit that resets on restart
+- Editable per-project email templates
+- `cyan auth project-create`, `cyan auth smtp`, `cyan auth policy`, `cyan auth template-edit` — see [docs/COMMANDS.md](docs/COMMANDS.md#auth-service)
 
 ### Web hosting
 - Deploy static sites, Node.js, Python, PHP, or React (build + serve), or Docker-based sites from a folder, a git repo, or a Docker image

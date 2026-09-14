@@ -176,6 +176,75 @@ class AuditLog(Base):
     created_at = Column(DateTime, default=utcnow)
 
 
+# ---------------------------------------------------------------------------
+# Auth Service — email+password authentication as a feature other apps can
+# use, scoped by project + API key (see authsvc/manager.py for the logic).
+# ---------------------------------------------------------------------------
+
+class AuthProject(Base):
+    __tablename__ = "auth_projects"
+    id = Column(Integer, primary_key=True)
+    project_id = Column(String, unique=True, nullable=False, index=True)  # public id, e.g. proj_ab12cd34
+    name = Column(String, nullable=False)
+    description = Column(Text, default="")
+    api_key_hash = Column(String, nullable=False)      # sha256 of the real key — raw key is shown once, at creation
+    api_key_prefix = Column(String, nullable=False)     # short prefix shown in listings, e.g. ck_live_ab12
+    require_email_verification = Column(Boolean, default=True)
+    password_min_length = Column(Integer, default=10)
+    max_login_attempts = Column(Integer, default=5)
+    lockout_minutes = Column(Integer, default=15)
+    otp_ttl_minutes = Column(Integer, default=10)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class AuthSMTPConfig(Base):
+    __tablename__ = "auth_smtp_config"
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("auth_projects.id"), unique=True, nullable=False)
+    host = Column(String, nullable=False)
+    port = Column(Integer, nullable=False)
+    email = Column(String, nullable=False)            # SMTP username / from-address
+    app_password_encrypted = Column(Text, nullable=False)  # Fernet-encrypted, never stored/returned in plaintext
+    use_tls = Column(Boolean, default=True)
+    from_name = Column(String, default="Cyan Server")
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class AuthEndUser(Base):
+    __tablename__ = "auth_end_users"
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("auth_projects.id"), nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    email_verified = Column(Boolean, default=False)
+    failed_attempts = Column(Integer, default=0)
+    lockout_count = Column(Integer, default=0)          # how many times this account has been locked — drives progressive backoff
+    locked_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class AuthVerification(Base):
+    __tablename__ = "auth_verifications"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("auth_end_users.id"), nullable=False, index=True)
+    purpose = Column(String, nullable=False)   # email_verify | password_reset
+    token = Column(String, unique=True, nullable=False, index=True)  # for the link
+    otp_code = Column(String, nullable=False)                          # 6-digit, for the OTP path
+    expires_at = Column(DateTime, nullable=False)
+    consumed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=utcnow)
+
+
+class AuthEmailTemplate(Base):
+    __tablename__ = "auth_email_templates"
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("auth_projects.id"), nullable=False, index=True)
+    template_type = Column(String, nullable=False)  # verify_email | otp | password_reset
+    subject = Column(String, nullable=False)
+    body_html = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 class UpdateConfig(Base):
     __tablename__ = "update_config"
     id = Column(Integer, primary_key=True)
