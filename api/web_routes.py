@@ -18,6 +18,8 @@ class CreateSiteRequest(BaseModel):
     port: int
     domain: str | None = None
     env_vars: dict = {}
+    replicas: int = 1
+    lb_policy: str = "round_robin"   # round_robin | least_conn | random | ip_hash
 
 
 def _serialize(site) -> dict:
@@ -51,6 +53,7 @@ def _serialize(site) -> dict:
         "id": site.id, "name": site.name, "site_type": site.site_type,
         "source_type": site.source_type, "source": site.source, "port": site.port,
         "domain": site.domain, "status": site.status, "pid": site.pid,
+        "replicas": site.replicas or 1, "lb_policy": site.lb_policy or "round_robin",
         "tunnel": tunnel_info,
     }
 
@@ -77,6 +80,7 @@ def create_site(req: CreateSiteRequest, _=Depends(require_auth)):
         site = web_manager.create_site(
             req.name, req.site_type, req.source_type, req.source,
             req.port, _clean_domain(req.domain), req.env_vars,
+            req.replicas, req.lb_policy,
         )
         return _serialize(site)
     except web_manager.SiteError as e:

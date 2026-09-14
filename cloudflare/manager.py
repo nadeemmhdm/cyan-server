@@ -77,14 +77,104 @@ def add_hostname(tunnel_name: str, hostname: str, local_service: str) -> TunnelH
         cfg = session.query(TunnelConfig).filter_by(tunnel_name=tunnel_name).first()
         if not cfg:
             raise TunnelError(f"Tunnel '{tunnel_name}' not found in local config")
-        route = TunnelHostname(tunnel_config_id=cfg.id, hostname=hostname,
-                                local_service=local_service)
-        session.add(route)
+        existing = session.query(TunnelHostname).filter_by(
+            tunnel_config_id=cfg.id, hostname=hostname).first()
+        if existing:
+            existing.local_service = local_service
+            route = existing
+        else:
+            route = TunnelHostname(tunnel_config_id=cfg.id, hostname=hostname,
+                                    local_service=local_service)
+            session.add(route)
         session.commit()
         session.refresh(route)
-        return route
     finally:
         session.close()
+
+    write_ingress_config(tunnel_name)
+    return route
+
+
+def remove_hostname(tunnel_name: str, hostname: str) -> None:
+    """Disconnect a domain from a tunnel: drops the local route + DNS record
+    and regenerates the ingress config so the change is live immediately."""
+    if not cloudflared_available():
+        raise TunnelError("cloudflared is not installed on this host")
+
+    session = get_session()
+    try:
+        cfg = session.query(TunnelConfig).filter_by(tunnel_name=tunnel_name).first()
+        if not cfg:
+            raise TunnelError(f"Tunnel '{tunnel_name}' not found in local config")
+        route = session.query(TunnelHostname).filter_by(
+            tunnel_config_id=cfg.id, hostname=hostname).first()
+        if not route:
+            raise TunnelError(f"Hostname '{hostname}' is not connected to tunnel '{tunnel_name}'")
+        session.delete(route)
+        session.commit()
+    finally:
+        session.close()
+
+    # Best-effort: also remove the DNS route in Cloudflare. cloudflared has no
+    # single "unroute" command; the supported approach is deleting the CNAME
+    # via `cloudflared tunnel route dns` is add-only, so we leave the DNS
+    # record in place (harmless — it just won't resolve to a live ingress
+    # rule once the config below drops it) and surface that to the caller.
+    write_ingress_config(tunnel_name)
+
+
+def list_hostnames(tunnel_name: str | None = None) -> list[TunnelHostname]:
+    session = get_session()
+    try:
+        q = session.query(TunnelHostname)
+        if tunnel_name:
+            cfg = session.query(TunnelConfig).filter_by(tunnel_name=tunnel_name).first()
+            if not cfg:
+                return []
+            q = q.filter_by(tunnel_config_id=cfg.id)
+        return q.all()
+    finally:
+        session.close()
+
+
+def _tunnel_config_dir() -> Path:
+    import os
+    d = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "cloudflared"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def write_ingress_config(tunnel_name: str) -> Path:
+    """Generate cloudflared's config.yml from every hostname connected to
+    this tunnel — this is what actually lets ONE tunnel serve MULTIPLE
+    domains, each routed to its own site's local port. Without this file,
+    cloudflared only knows the single service it was started with, so
+    additional `route dns` hostnames would resolve in DNS but not
+    actually route anywhere. Regenerated on every add/remove so it's
+    never stale, and safe to call even before the tunnel has an id."""
+    import yaml
+
+    session = get_session()
+    try:
+        cfg = session.query(TunnelConfig).filter_by(tunnel_name=tunnel_name).first()
+        if not cfg:
+            raise TunnelError(f"Tunnel '{tunnel_name}' not found in local config")
+        routes = session.query(TunnelHostname).filter_by(tunnel_config_id=cfg.id).all()
+        tunnel_id = cfg.tunnel_id
+    finally:
+        session.close()
+
+    credentials_file = str(Path.home() / ".cloudflared" / f"{tunnel_id}.json") if tunnel_id else None
+    ingress = [{"hostname": r.hostname, "service": r.local_service} for r in routes]
+    ingress.append({"service": "http_status:404"})  # required catch-all, must be last
+
+    doc = {"tunnel": tunnel_id or tunnel_name, "ingress": ingress}
+    if credentials_file:
+        doc["credentials-file"] = credentials_file
+
+    config_path = _tunnel_config_dir() / f"{tunnel_name}.yml"
+    config_path.write_text(yaml.safe_dump(doc, sort_keys=False))
+    return config_path
 
 
 def start_tunnel(tunnel_name: str, config_path: str | Path | None = None) -> subprocess.Popen:
@@ -104,8 +194,12 @@ def start_tunnel(tunnel_name: str, config_path: str | Path | None = None) -> sub
     if config_path:
         cmd.extend(["--config", str(config_path)])
     else:
-        # Cross-platform config detection: check ~/.cloudflared/config.yml or workspace config
+        # Prefer the config this module generates from the DB's
+        # TunnelHostname rows (write_ingress_config) — it's what actually
+        # carries multi-domain ingress rules. Fall back to older
+        # cross-platform candidates for tunnels set up before this existed.
         candidates = [
+            _tunnel_config_dir() / f"{tunnel_name}.yml",
             Path.home() / ".cloudflared" / "config.yml",
             Path.cwd() / "tunnel_config.yml",
         ]

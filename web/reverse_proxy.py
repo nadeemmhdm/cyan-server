@@ -80,9 +80,13 @@ def render_caddyfile(sites: list[Website]) -> str:
             host = f"http://{clean_dom}, {clean_dom}"
         else:
             host = f":{_pick_public_port(site)}"
+        replicas = site.replicas or 1
+        upstreams = " ".join(f"127.0.0.1:{site.port + i}" for i in range(replicas))
+        lb_directive = f"        lb_policy {site.lb_policy or 'round_robin'}\n" if replicas > 1 else ""
         blocks.append(
             f"{host} {{\n"
-            f"    reverse_proxy 127.0.0.1:{site.port} {{\n"
+            f"    reverse_proxy {upstreams} {{\n"
+            f"{lb_directive}"
             f"        @custom status 403 404 500 502 503\n"
             f"        handle_response @custom {{\n"
             f'            root * "{errors_dir.as_posix()}"\n'

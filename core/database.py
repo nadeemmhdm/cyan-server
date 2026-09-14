@@ -89,6 +89,9 @@ class Website(Base):
     env_vars = Column(Text, default="{}")            # JSON-encoded dict
     status = Column(String, default="stopped")        # stopped | running | failed
     pid = Column(Integer, nullable=True)
+    replicas = Column(Integer, default=1)               # number of backend instances for load balancing
+    lb_policy = Column(String, default="round_robin")     # round_robin | least_conn | random | ip_hash
+    replica_pids = Column(Text, default="[]")              # JSON list of PIDs for instances beyond the first (index 0 == `pid`)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

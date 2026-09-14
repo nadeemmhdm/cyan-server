@@ -53,17 +53,29 @@ def _log_event(session, website_id: int, action: str, success: bool, message: st
     session.commit()
 
 
+LB_POLICIES = {"round_robin", "least_conn", "random", "ip_hash"}
+
+
 def create_site(name: str, site_type: str, source_type: str, source: str,
                  port: int, domain: str | None = None,
-                 env_vars: dict | None = None) -> Website:
+                 env_vars: dict | None = None, replicas: int = 1,
+                 lb_policy: str = "round_robin") -> Website:
     session = get_session()
     try:
         if session.query(Website).filter_by(name=name).first():
             raise SiteError(f"Site '{name}' already exists")
 
+        if replicas < 1 or replicas > 8:
+            raise SiteError("replicas must be between 1 and 8")
+        if lb_policy not in LB_POLICIES:
+            raise SiteError(f"lb_policy must be one of: {', '.join(sorted(LB_POLICIES))}")
+
         _, _, net_mgr = get_platform_adapters()
-        if not net_mgr.is_port_available(port):
-            raise SiteError(f"Port {port} is already in use")
+        for offset in range(replicas):
+            check_port = port + offset
+            if not net_mgr.is_port_available(check_port):
+                raise SiteError(f"Port {check_port} is already in use"
+                                 + (f" (needed for replica {offset + 1}/{replicas})" if replicas > 1 else ""))
 
         if source_type == "folder":
             src = Path(source)
@@ -79,6 +91,7 @@ def create_site(name: str, site_type: str, source_type: str, source: str,
             name=name, site_type=site_type, source_type=source_type,
             source=source, port=port, domain=domain,
             env_vars=json.dumps(env_vars or {}), status="stopped",
+            replicas=replicas, lb_policy=lb_policy,
         )
         session.add(site)
         session.commit()
@@ -141,12 +154,16 @@ def fetch_source(site: Website) -> Path:
     raise SiteError(f"Unknown source_type: {site.source_type}")
 
 
-def _start_command(site: Website, path: Path) -> list[str] | None:
+def _start_command(site: Website, path: Path, port: int | None = None) -> list[str] | None:
     """Return the process command for non-docker site types. Static sites
     are served with Python's http.server — a real, working static server,
-    not a placeholder."""
+    not a placeholder. `port` lets deploy_site() launch extra replica
+    instances on different ports than site.port for load balancing;
+    defaults to site.port for the normal single-instance case."""
+    port = port if port is not None else site.port
+
     if site.site_type == "static":
-        return [sys.executable, "-m", "http.server", str(site.port), "--directory", str(path)]
+        return [sys.executable, "-m", "http.server", str(port), "--directory", str(path)]
 
     if site.site_type == "node":
         if not shutil.which("node"):
@@ -173,7 +190,7 @@ def _start_command(site: Website, path: Path) -> list[str] | None:
     if site.site_type == "php":
         if not shutil.which("php"):
             raise SiteError("php is not installed on this host")
-        return ["php", "-S", f"0.0.0.0:{site.port}", "-t", str(path)]
+        return ["php", "-S", f"0.0.0.0:{port}", "-t", str(path)]
 
     if site.site_type == "react":
         npm_bin = shutil.which("npm")
@@ -192,7 +209,7 @@ def _start_command(site: Website, path: Path) -> list[str] | None:
         output_dir = next((path / d for d in ("build", "dist") if (path / d).is_dir()), None)
         if not output_dir:
             raise SiteError("build succeeded but no build/ or dist/ output directory was found")
-        return [sys.executable, "-m", "http.server", str(site.port), "--directory", str(output_dir)]
+        return [sys.executable, "-m", "http.server", str(port), "--directory", str(output_dir)]
 
     return None
 
@@ -237,14 +254,24 @@ def deploy_site(name: str) -> Website:
             if not shutil.which("docker"):
                 _log_event(session, site.id, "deploy", False, "Docker not installed")
                 raise SiteError("Docker is not installed on this host")
-            cmd = ["docker", "run", "-d", "--name", f"cyan-{name}",
-                   "-p", f"{site.port}:{site.port}", site.source]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            if result.returncode != 0:
-                _log_event(session, site.id, "deploy", False, result.stderr)
-                raise SiteError(f"docker run failed: {result.stderr}")
+            replica_container_names = []
+            for i in range(site.replicas or 1):
+                inst_port = site.port + i
+                cname = f"cyan-{name}" if i == 0 else f"cyan-{name}-r{i}"
+                cmd = ["docker", "run", "-d", "--name", cname,
+                       "-p", f"{inst_port}:{inst_port}",
+                       "-e", f"PORT={inst_port}", site.source]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if result.returncode != 0:
+                    # Roll back any replicas already started for this deploy.
+                    for started in replica_container_names:
+                        subprocess.run(["docker", "rm", "-f", started], capture_output=True, timeout=30)
+                    _log_event(session, site.id, "deploy", False, result.stderr)
+                    raise SiteError(f"docker run failed: {result.stderr}")
+                replica_container_names.append(cname)
             site.status = "running"
             site.pid = None
+            site.replica_pids = "[]"
         else:
             cmd = _start_command(site, path)
             if cmd is None:
@@ -261,18 +288,43 @@ def deploy_site(name: str) -> Website:
             else:
                 popen_kwargs["start_new_session"] = True
 
+            replicas = site.replicas or 1
+            cmd_template = cmd  # already computed above via _start_command(site, path)
+            pids: list[int] = []
             with open(log_path, "a") as logf:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=logf,
-                    stderr=subprocess.STDOUT,
-                    **popen_kwargs,
-                )
-            site.pid = proc.pid
+                for i in range(replicas):
+                    inst_port = site.port + i
+                    if site.site_type == "static":
+                        argv = [sys.executable, "-m", "http.server", str(inst_port), "--directory", str(path)]
+                    elif site.site_type == "php":
+                        argv = ["php", "-S", f"0.0.0.0:{inst_port}", "-t", str(path)]
+                    elif site.site_type == "react":
+                        # cmd_template ends with [..., str(port), "--directory", str(output_dir)];
+                        # reuse the already-built output_dir, just rebind the port per replica.
+                        output_dir = cmd_template[-1]
+                        argv = [sys.executable, "-m", "http.server", str(inst_port), "--directory", output_dir]
+                    else:
+                        # node / python read their port from the PORT env var, not argv —
+                        # same command for every replica, only the env differs below.
+                        argv = cmd_template
+                    inst_env = dict(env)
+                    inst_env["PORT"] = str(inst_port)
+                    proc = subprocess.Popen(
+                        argv,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        cwd=path,
+                        env=inst_env,
+                        **{k: v for k, v in popen_kwargs.items() if k not in ("cwd", "env")},
+                    )
+                    pids.append(proc.pid)
+            site.pid = pids[0]
+            site.replica_pids = json.dumps(pids[1:])
             site.status = "running"
 
         session.commit()
-        _log_event(session, site.id, "deploy", True, f"Deployed as {site.site_type} on port {site.port}")
+        lb_note = f" ({site.replicas} replicas, {site.lb_policy})" if (site.replicas or 1) > 1 else ""
+        _log_event(session, site.id, "deploy", True, f"Deployed as {site.site_type} on port {site.port}{lb_note}")
 
         all_sites = session.query(Website).all()
         reload_caddy(all_sites)
@@ -318,11 +370,19 @@ def stop_site(name: str) -> Website:
         if site.site_type == "docker":
             subprocess.run(["docker", "stop", f"cyan-{name}"], capture_output=True, timeout=30)
             subprocess.run(["docker", "rm", f"cyan-{name}"], capture_output=True, timeout=30)
-        elif site.pid:
-            kill_process_tree(site.pid)
+            for i in range(1, site.replicas or 1):
+                cname = f"cyan-{name}-r{i}"
+                subprocess.run(["docker", "stop", cname], capture_output=True, timeout=30)
+                subprocess.run(["docker", "rm", cname], capture_output=True, timeout=30)
+        else:
+            if site.pid:
+                kill_process_tree(site.pid)
+            for rpid in json.loads(site.replica_pids or "[]"):
+                kill_process_tree(rpid)
 
         site.status = "stopped"
         site.pid = None
+        site.replica_pids = "[]"
         session.commit()
         _log_event(session, site.id, "stop", True, "Site stopped")
 
