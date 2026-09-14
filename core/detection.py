@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Core System Detection
 Platform-independent hardware/OS/network detection.

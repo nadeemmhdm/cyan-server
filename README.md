@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.7.3-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.9.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -90,6 +90,7 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 ### Web hosting
 - Deploy static sites, Node.js, Python, PHP, or React (build + serve), or Docker-based sites from a folder, a git repo, or a Docker image
 - Real **Caddy**-backed reverse proxy — Caddyfile generated from your sites and hot-reloaded via Caddy's admin API, no manual config editing
+- **Load balancing** — `cyan web create ... --replicas N --lb-policy <policy>` runs N real backend instances of a site behind Caddy, distributed with `round_robin`, `least_conn`, `random`, or `ip_hash`. Stopping the site tears down every replica cleanly
 - **Site file manager** — list, read, edit, upload, and delete files directly inside a deployed site's folder, without a full redeploy. Editing a static/React file takes effect on the next request — no restart needed
 - **Domain and subdomain connection** — `cyan web domain <site> <hostname>` connects (or changes, or clears) a hostname live, no redeploy needed; subdomains work exactly the same way as root domains
 - Per-site logs, start/stop/redeploy
@@ -120,6 +121,7 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 ### Worldwide access via tunnels
 - **Two tunnel providers**: Cloudflare Tunnel (custom domains, needs a Cloudflare account) and ngrok (instant public URL, no domain needed) — `cyan tunnel status` shows what's installed
 - **`cyan tunnel connect <site> ...`** — the actual "local site, worldwide access" step in one command: looks up your deployed site's real local port automatically, so you never construct a `local_service` URL by hand
+- **Multiple domains per tunnel** — run `cyan tunnel connect` again with a different `--hostname`/site and the same `--tunnel-name`: one Cloudflare tunnel serves any number of domains, each routed to its own site's real port via a generated `cloudflared` ingress config (not just a DNS record with nowhere to route). `cyan tunnel domains` lists everything connected; `cyan tunnel disconnect-domain` drops one
 - Once a site has a connected domain (`cyan web domain`) *and* a tunnel route to that same hostname, it's reachable from any device, anywhere, with no port-forwarding and no public IP
 - Fully optional — nothing else in Cyan Server depends on either provider; LAN/local hosting works with zero internet exposure
 

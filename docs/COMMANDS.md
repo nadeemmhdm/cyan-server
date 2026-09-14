@@ -114,14 +114,19 @@ cyan ports
 cyan web list
 ```
 
-### `cyan web create <name> <site_type> <source_type> <source> <port> [--domain]`
+### `cyan web create <name> <site_type> <source_type> <source> <port> [--domain] [--replicas N] [--lb-policy POLICY]`
 `site_type`: `static` | `node` | `python` | `php` | `react` | `docker`
 `source_type`: `folder` | `git` | `docker_image`
+`--replicas` (default `1`, max `8`): number of real backend instances to run behind Caddy for load balancing.
+`--lb-policy` (default `round_robin`): `round_robin` | `least_conn` | `random` | `ip_hash` — only matters when `--replicas` > 1.
 ```bash
 cyan web create mysite static folder ./my-site 8080
 cyan web create api node git https://github.com/me/api.git 3000
 cyan web create blog react folder ./blog-source 8081
 cyan web create app docker docker_image nginx:latest 80
+
+# Load-balanced: 3 real instances on ports 4000-4002, least-connections routing
+cyan web create api node git https://github.com/me/api.git 4000 --replicas 3 --lb-policy least_conn
 ```
 
 ### `cyan web deploy <name>`
@@ -357,6 +362,33 @@ cyan tunnel connect mysite --hostname mysite.example.com --tunnel-name my-tunnel
 
 # ngrok: hostname optional (random public URL if omitted)
 cyan tunnel connect mysite --provider ngrok
+```
+
+**Multiple domains on one tunnel:** run `cyan tunnel connect` again with a
+different site and `--hostname`, same `--tunnel-name` — one Cloudflare
+tunnel can carry any number of domains, each routed to its own site's
+real port via a generated `cloudflared` ingress config (not just a DNS
+record with nowhere to route).
+```bash
+cyan tunnel connect blog --hostname blog.example.com --tunnel-name my-tunnel
+cyan tunnel connect api  --hostname api.example.com  --tunnel-name my-tunnel
+```
+
+### `cyan tunnel domains [--tunnel-name NAME]`
+List every domain currently connected (optionally filtered to one
+tunnel).
+```bash
+cyan tunnel domains
+cyan tunnel domains --tunnel-name my-tunnel
+```
+
+### `cyan tunnel disconnect-domain <hostname> <tunnel_name>`
+Drop a domain from a tunnel's ingress config — the DNS record itself
+stays in Cloudflare (there's no single `cloudflared` command to remove
+that part), but traffic stops routing anywhere once it's out of the
+config.
+```bash
+cyan tunnel disconnect-domain blog.example.com my-tunnel
 ```
 
 ### `cyan tunnel url [--port N]`

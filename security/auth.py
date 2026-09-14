@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Security / Auth
 Real bcrypt password hashing + JWT session tokens. No plaintext passwords,

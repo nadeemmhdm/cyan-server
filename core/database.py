@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Database
 SQLite-backed persistence (per spec section 21). One file, real schema,

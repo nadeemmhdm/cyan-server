@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Interactive Menu System
 Provides the numbered menu interface requested for:

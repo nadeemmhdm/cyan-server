@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Unit and Integration tests for Cyan Server v0.7.2 features:
 1. ZIP extraction with Zip Slip path-traversal protection
 2. API Key write-only permission scoping

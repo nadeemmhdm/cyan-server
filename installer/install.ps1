@@ -1,4 +1,4 @@
-# Cyan Server installer for Windows.
+# Cyan Server installer for Windows. — https://github.com/nadeemmhdm/cyan-server
 # Usage: irm https://install.cyanserver.dev/windows | iex
 
 $ErrorActionPreference = "Stop"

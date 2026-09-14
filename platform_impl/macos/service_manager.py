@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """macOS implementation of ServiceManager, backed by launchctl."""
 from __future__ import annotations
 

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, Depends

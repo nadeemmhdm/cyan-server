@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Test the recovery/liveness-detection fix: PID existence alone is not a
 reliable 'is this site running' signal (PIDs get reused, especially fast
 in containers) — the real check has to be port-level."""

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """macOS implementation of NetworkManager."""
 from __future__ import annotations
 

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Site-to-Tunnel Connection
 The piece that actually makes "deploy locally, access worldwide" a single
@@ -30,35 +31,6 @@ def get_site_port(site_name: str) -> int:
 
 import re
 from pathlib import Path
-
-
-def _sync_tunnel_config_yaml(tunnel_name: str, hostname: str, port: int) -> None:
-    """Ensure tunnel_config.yml or ~/.cloudflared/config.yml has this hostname ingress rule configured."""
-    candidates = [
-        Path.cwd() / "tunnel_config.yml",
-        Path.home() / ".cloudflared" / "config.yml",
-        Path.home() / ".cyan-server" / "tunnel_config.yml"
-    ]
-    for cfg_path in candidates:
-        if cfg_path.exists():
-            try:
-                content = cfg_path.read_text(encoding="utf-8")
-                # Fix any localhost:80 to 127.0.0.1:80 for IPv6 loopback safety
-                content = content.replace("http://localhost:80", "http://127.0.0.1:80")
-                if f"hostname: {hostname}" in content:
-                    cfg_path.write_text(content, encoding="utf-8")
-                    continue
-                new_rule = f"  - hostname: {hostname}\n    service: http://127.0.0.1:80\n"
-                if "ingress:" in content:
-                    if "- service: http_status:404" in content:
-                        content = content.replace("  - service: http_status:404", f"{new_rule}  - service: http_status:404")
-                    else:
-                        content += f"\n{new_rule}"
-                else:
-                    content += f"\ningress:\n{new_rule}  - service: http_status:404\n"
-                cfg_path.write_text(content, encoding="utf-8")
-            except Exception:
-                pass
 
 
 def get_default_tunnel_name() -> str:
@@ -103,16 +75,18 @@ def connect_site_to_cloudflare(site_name: str, hostname: str, tunnel_name: str |
     except Exception:
         pass
 
-    # Add hostname route to cloudflared
+    # Add hostname route to cloudflared, and regenerate the full multi-domain
+    # ingress config from every hostname on this tunnel (add_hostname() does
+    # this internally via cloudflare.manager.write_ingress_config — the
+    # single source of truth for this file; previously a second, separate
+    # writer here duplicated the job with the site's real port hardcoded to
+    # 80, and only touched a config file that already happened to exist).
     try:
         add_hostname(tunnel_name, clean_host, f"http://127.0.0.1:{port}")
     except TunnelError as e:
         if "not installed" in str(e).lower() or "not found" in str(e).lower():
             raise TunnelConnectError(str(e))
         pass
-
-    # Auto-generate / sync tunnel_config.yml ingress rules
-    _sync_tunnel_config_yaml(tunnel_name, clean_host, port)
 
     # Persist state for reboot recovery
     record_tunnel_route(tunnel_name=tunnel_name, provider="cloudflare", site_name=site_name, hostname=clean_host, port=port)

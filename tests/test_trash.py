@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Trash/recycle bin tests: real files moved to a real trash directory and
 back, real expiry-based purge logic — not mocked."""
 import os

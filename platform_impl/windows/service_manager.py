@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Windows implementation of ServiceManager, backed by sc.exe."""
 from __future__ import annotations
 

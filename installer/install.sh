@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Cyan Server installer for Linux / macOS.
+# Cyan Server installer for Linux / macOS. — https://github.com/nadeemmhdm/cyan-server
 # Usage: curl -fsSL https://install.cyanserver.dev | sh
 set -eu
 

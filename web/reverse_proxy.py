@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Web Server Engine
 Manages a real Caddy instance as the reverse proxy (spec section 14).

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Smoke tests: detection must return real, self-consistent values on any
 platform this runs on. These are not mocked — they assert against the
 actual live host."""

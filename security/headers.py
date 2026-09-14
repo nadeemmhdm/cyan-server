@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Security response headers, applied to every agent response."""
 from __future__ import annotations
 

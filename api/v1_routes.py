@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Unified Client v1 API
 Allows external applications, websites, and scripts to access Databases and

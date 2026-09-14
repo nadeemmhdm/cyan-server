@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Tests for the php and react site types added to web/manager.py.
 React is live-tested for real (npm install + npm run build + serve the
 real output directory — no react dependency needed to test the pipeline

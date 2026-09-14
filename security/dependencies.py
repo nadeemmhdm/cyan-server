@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """FastAPI dependency for JWT-authenticated, role-checked routes."""
 from __future__ import annotations
 

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Web Server: Site Manager
 Handles: create -> select source (folder/git/docker) -> pick port -> deploy

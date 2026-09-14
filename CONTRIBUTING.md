@@ -35,13 +35,22 @@ python3 cli/main.py login --username admin --password "<from agent output>"
 ## Running tests
 
 ```bash
-python3 tests/test_detection.py   # hardware/OS detection
-python3 tests/test_services.py    # auth, storage, app validation
-python3 tests/test_recovery.py    # crash/reboot recovery
-python3 tests/test_recovery.py    # crash/reboot recovery
+pip install pytest pytest-asyncio httpx python-multipart
+pytest tests/ -q
 ```
 
-CI (`.github/workflows/ci.yml`) runs all three on every push.
+`tests/conftest.py` gives each test file its own isolated `CYAN_DATA_DIR`
+and database — if you add a new test file that sets `CYAN_DATA_DIR`
+itself, store the directory as a module-level `_TEST_DATA_DIR` (see any
+existing `tests/test_*.py` for the pattern) so conftest picks it up.
+
+Two tests need a live agent already running on `localhost:7331` with a
+logged-in session (`test_interactive_cli.py`, `test_v073_features.py`) —
+they're integration tests, not plain unit tests, and will fail under a
+bare `pytest tests/` run without one. Everything else (46 of 48 tests as
+of this writing) runs standalone.
+
+CI (`.github/workflows/ci.yml`) runs the suite on every push.
 
 ## Where things live
 

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Website delete-to-trash / restore-from-trash tests. Real files, real DB
 rows, real Caddy config regeneration. Specifically guards against a real
 bug caught during live testing: web/manager.py::_site_dir() auto-creates

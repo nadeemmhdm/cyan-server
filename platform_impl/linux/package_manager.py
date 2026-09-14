@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Linux implementation of PackageManager. Detects apt/dnf/pacman and
 never executes an install without a caller-confirmed InstallPlan."""
 from __future__ import annotations

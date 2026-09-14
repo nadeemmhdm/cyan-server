@@ -22,12 +22,15 @@ disclosure timeline.
 
 | Version | Supported |
 |---|---|
-| 0.5.x   | ✅ |
-| < 0.5   | ❌ (upgrade — `cyan update`) |
+| 0.9.x   | ✅ |
+| 0.6.x – 0.8.x | ✅ (upgrade recommended — `cyan update`) |
+| < 0.6   | ❌ (upgrade — `cyan update`) |
 
-## Current security posture (v0.5.1)
+## Current security posture (v0.9.0)
 
 - Passwords: bcrypt-hashed, never stored or logged in plaintext.
+- Optional TOTP two-factor authentication per user, on top of the
+  password/JWT flow below.
 - Sessions: JWT, 12-hour expiry, signed with a per-install secret generated
   on first run (`~/.cyan-server/.cyan_secret`, `0600` permissions).
 - Login endpoint: IP-based sliding-window rate limiting (10 req/min) and
@@ -65,6 +68,11 @@ disclosure timeline.
 - Postgres database drops (via the Database Manager) are always
   permanent — there's no trash/snapshot step for a live SQL database yet
   (SQLite databases do go through the same 30-day trash as storage/sites).
+- Load-balanced sites (`--replicas > 1`) run multiple real backend
+  processes on consecutive ports on the same host — they share that
+  host's resources and are not a substitute for multi-host redundancy.
+  All replicas of a site trust the same source/env vars as a single
+  instance would; there's no per-replica isolation.
 - Windows has been live-verified by a contributor as of v0.5.1 (6 real
   bugs found and fixed — see the changelog). macOS has not yet had an
   equivalent real-hardware pass; treat the macOS platform adapter as

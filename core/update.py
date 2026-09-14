@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Update Manager (spec: `cyan update`)
 Real git-based self-update: checks the local checkout against its remote,

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Rate Limiting & Account Lockout
 Real, in-process sliding-window rate limiting + per-username lockout after

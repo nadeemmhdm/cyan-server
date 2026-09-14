@@ -15,24 +15,13 @@ jobs:
       - name: Install system deps
         run: sudo apt-get update && sudo apt-get install -y caddy
       - name: Install Python deps
-        run: pip install -r requirements.txt
-      - name: Run hardware/OS detection tests
-        run: python3 tests/test_detection.py
-      - name: Run auth/storage/app-manager tests
-        run: python3 tests/test_services.py
-      - name: Run recovery tests
-        run: python3 tests/test_recovery.py
-      - name: Run trash tests
-        run: python3 tests/test_trash.py
-      - name: Run website-trash tests
-        run: python3 tests/test_web_trash.py
-      - name: Run database tests
-        run: python3 tests/test_database.py
-      - name: Run backup tests
-        run: python3 tests/test_backup.py
-      - name: Run site-type tests
-        run: python3 tests/test_site_types.py
-      - name: Run tunnel-connect tests
-        run: python3 tests/test_tunnel_connect.py
-      - name: Run site-file-manager tests
-        run: python3 tests/test_site_files.py
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx python-multipart
+      - name: Run test suite
+        run: pytest tests/ -q -k "not test_interactive_cli and not test_v073_features"
+        # test_interactive_cli.py and test_v073_features.py are integration
+        # tests that need a live agent already running with a logged-in
+        # session — not runnable as plain unit tests in CI. Everything else
+        # (46 of 48 tests as of this writing) is covered here, including
+        # cross-test-file database isolation via tests/conftest.py.

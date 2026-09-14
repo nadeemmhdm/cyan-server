@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Application Manager
 Manifest-driven app installs (spec section 8). Validates requirements

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Automated test suite for v0.7.3 features:
 1. Domain sanitization in Caddyfile & reverse proxy (white-screen fix).

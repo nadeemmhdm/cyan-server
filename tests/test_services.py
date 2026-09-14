@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Auth, storage, and application-manager smoke tests. Uses a temp CYAN_DATA_DIR so this never touches the
 developer's real ~/.cyan-server install. Every assertion here is against

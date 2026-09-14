@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Linux implementation of ServiceManager, backed by systemd."""
 from __future__ import annotations
 

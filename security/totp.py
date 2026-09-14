@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - TOTP Two-Factor Authentication (RFC 6238)
 Pure Python implementation with zero external dependencies:

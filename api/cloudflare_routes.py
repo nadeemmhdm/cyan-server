@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -62,38 +63,6 @@ def remove_hostname(tunnel_name: str, hostname: str, _=Depends(require_auth)):
     try:
         cf_manager.remove_hostname(tunnel_name, hostname)
         return {"success": True}
-    except cf_manager.TunnelError as e:
-        raise HTTPException(400, str(e))
-
-
-class ConnectDomainRequest(BaseModel):
-    tunnel_name: str
-    hostname: str
-    site_name: str
-
-
-@router.post("/site/connect-domain")
-def connect_domain(req: ConnectDomainRequest, _=Depends(require_auth)):
-    """Point a domain at a site by name — the whole point of supporting
-    multiple domains per tunnel: call this once per domain you want
-    pointed at (the same or different) sites, no manual local_service
-    URL or DNS setup required. Regenerates the tunnel's ingress config
-    (so it actually serves all connected domains, not just the last
-    one) and hot-reloads a running tunnel immediately."""
-    from web import manager as web_manager
-    site = next((s for s in web_manager.list_sites() if s.name == req.site_name), None)
-    if not site:
-        raise HTTPException(404, f"Site '{req.site_name}' not found")
-    local_service = f"http://localhost:{site.port}"
-    try:
-        route = cf_manager.add_hostname(req.tunnel_name, req.hostname, local_service)
-        was_running = any(t["name"] == req.tunnel_name and t["status"] == "enabled"
-                           for t in cf_manager.status())
-        if was_running:
-            cf_manager.stop_tunnel(req.tunnel_name)
-            cf_manager.start_tunnel(req.tunnel_name)
-        return {"hostname": route.hostname, "site": req.site_name, "local_service": local_service,
-                "tunnel_reloaded": was_running}
     except cf_manager.TunnelError as e:
         raise HTTPException(400, str(e))
 

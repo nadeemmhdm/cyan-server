@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Site file manager tests. Real files, real path-traversal rejection
 scoped to a single site's folder (not the shared storage root)."""
 import os

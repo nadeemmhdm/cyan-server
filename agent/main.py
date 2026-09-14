@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server Agent
 Runs locally on the host. Exposes real system state and control endpoints

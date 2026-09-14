@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Database Manager tests. SQLite is real (a genuine file, real sqlite3
 connections, real queries) — Postgres path exists but isn't exercised here
 since it needs a real postgres install (see database/manager.py docstring

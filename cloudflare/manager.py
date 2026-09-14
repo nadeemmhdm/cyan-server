@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Cloudflare Tunnel Manager
 Wraps the real `cloudflared` CLI (spec section 9). This machine's sandboxed

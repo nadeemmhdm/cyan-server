@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Tunnel & Service State Persistence (Reboot Survival)
 Remembers active tunnels, connected domains, and hosted sites across system
@@ -110,7 +111,11 @@ def start_cloudflared_tunnel(tunnel_name: str) -> bool:
         return False
 
     cfg_file = None
+    canonical = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server")) / "cloudflared" / f"{tunnel_name}.yml"
     for c in [
+        canonical,  # written by cloudflare.manager.write_ingress_config() — the real, always-current
+                    # multi-hostname ingress config generated from the DB. Checked first so a stale
+                    # config.yml left over from manual cloudflared setup doesn't silently win.
         Path.home() / ".cloudflared" / "config.yml",
         Path.cwd() / "tunnel_config.yml",
         Path.home() / ".cyan-server" / "tunnel_config.yml",

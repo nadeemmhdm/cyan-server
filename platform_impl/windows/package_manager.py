@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """Windows implementation of PackageManager, backed by winget (falls back
 to choco if winget is unavailable)."""
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 End-to-End Test for Interactive CLI Features and Reboot Auto-Resume
 Tests:

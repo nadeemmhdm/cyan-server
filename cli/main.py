@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server CLI
 Talks to the local Agent over HTTP (http://localhost:7331). Every command
@@ -465,11 +466,15 @@ def web_list():
 
 @web_app.command("create")
 def web_create(name: str, site_type: str, source_type: str, source: str,
-                port: int, domain: str = typer.Option(None)):
+                port: int, domain: str = typer.Option(None),
+                replicas: int = typer.Option(1, "--replicas", help="Number of load-balanced backend instances (1-8)."),
+                lb_policy: str = typer.Option("round_robin", "--lb-policy",
+                                               help="round_robin|least_conn|random|ip_hash (only matters when --replicas > 1)")):
     """site_type: static|node|python|php|react|docker  source_type: folder|git|docker_image"""
     result = _agent_post("/api/web", {
         "name": name, "site_type": site_type, "source_type": source_type,
         "source": source, "port": port, "domain": domain,
+        "replicas": replicas, "lb_policy": lb_policy,
     }, auth=True)
     console.print(f"[green]✓ Site '{result['name']}' created (stopped)[/green]. "
                    f"Run [bold]cyan web deploy {name}[/bold] to start it.")
@@ -915,6 +920,38 @@ def tunnel_url(port: int = typer.Option(None, help="Filter to a specific local p
         console.print(f"[green]{result['public_url']}[/green]")
     else:
         console.print("[yellow]No active ngrok tunnel found.[/yellow]")
+
+
+@tunnel_app.command("domains")
+def tunnel_domains(tunnel_name: str = typer.Option(None, help="Filter to one Cloudflare tunnel.")):
+    """List every domain currently connected — one Cloudflare tunnel can
+    carry any number of these, each pointed at its own site. Run
+    'cyan tunnel connect <site> --hostname <domain> --tunnel-name <name>'
+    again with a different --hostname/site to add more."""
+    q = f"?tunnel_name={tunnel_name}" if tunnel_name else ""
+    result = _agent_get(f"/api/cloudflare/hostnames{q}", auth=True)
+    if not result:
+        console.print("[yellow]No domains connected yet.[/yellow]")
+        return
+    table = Table()
+    for col in ("Hostname", "Local service"):
+        table.add_column(col)
+    for r in result:
+        table.add_row(r["hostname"], r["local_service"])
+    console.print(table)
+
+
+@tunnel_app.command("disconnect-domain")
+def tunnel_disconnect_domain(hostname: str, tunnel_name: str):
+    """Drop a domain from a Cloudflare tunnel's ingress config (the DNS
+    CNAME itself stays in Cloudflare — cloudflared has no single-command
+    way to remove that part — but traffic stops routing anywhere once
+    it's out of the ingress config, and the config is regenerated
+    immediately so a running tunnel picks it up on its next request)."""
+    from urllib.parse import quote
+    path = f"/api/cloudflare/hostname?tunnel_name={quote(tunnel_name)}&hostname={quote(hostname)}"
+    _agent_post(path, auth=True, method="DELETE")
+    console.print(f"[green]✓ '{hostname}' disconnected from tunnel '{tunnel_name}'[/green]")
 
 
 # --- Database Management -----------------------------------------------------

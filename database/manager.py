@@ -1,3 +1,4 @@
+# Cyan Server — https://github.com/nadeemmhdm/cyan-server
 """
 Cyan Server - Database Manager (spec section 4: Database Server)
 Provisions and manages real SQL databases for hosted apps.
