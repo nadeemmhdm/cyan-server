@@ -15,14 +15,43 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 
-DATA_DIR = Path(os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "cyan.db"
-
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False,
-                             expire_on_commit=False)
 Base = declarative_base()
+
+DATA_DIR: Path
+DB_PATH: Path
+engine = None
+SessionLocal = None
+
+
+def configure(data_dir: "str | Path | None" = None) -> Path:
+    """(Re)point the database layer at a data directory and create a fresh
+    engine/session factory bound to it.
+
+    core.database is a single module cached by Python's import system, so
+    the old module-level `DATA_DIR = Path(os.environ[...])` only ever ran
+    once per process -- on whichever import happened first. Every test
+    file (and any future multi-instance use) that set CYAN_DATA_DIR and
+    expected a fresh, isolated database was silently sharing the very
+    first engine created in the process instead. Call this whenever the
+    target data directory needs to change; it's also called once at
+    import time below using CYAN_DATA_DIR / the default location.
+    """
+    global DATA_DIR, DB_PATH, engine, SessionLocal
+    DATA_DIR = Path(data_dir) if data_dir is not None else Path(
+        os.environ.get("CYAN_DATA_DIR", Path.home() / ".cyan-server"))
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    DB_PATH = DATA_DIR / "cyan.db"
+
+    if engine is not None:
+        engine.dispose()
+
+    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+    SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False,
+                                 expire_on_commit=False)
+    return DATA_DIR
+
+
+configure()
 
 
 def utcnow() -> datetime.datetime:

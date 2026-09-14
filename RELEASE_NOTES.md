@@ -1,3 +1,12 @@
+# Cyan Server v0.8.0 Release Notes
+
+**Cyan Server v0.8.0** is a reliability release fixing a real data-integrity bug in the database layer, discovered while auditing the test suite:
+
+1. **Database engine was fixed to the first-configured data directory for the life of the process.** `core/database.py` computed its SQLite engine path once, at import time, from `CYAN_DATA_DIR`. Any code path that changes `CYAN_DATA_DIR` after startup (or a process that re-points itself at a different data directory) kept silently reading and writing the *original* directory's `cyan.db` instead. Added `core.database.configure()` to rebuild the engine/session factory on demand, and fixed `backup/manager.py`'s `_safe_sqlite_snapshot` (it held its own stale, import-time-cached copy of `DB_PATH`) to always read the current path.
+2. **Test suite was not actually isolated between test files.** Because of the same root cause, running the full suite (`pytest tests/`) had every test module silently sharing whichever module's data directory was configured last, instead of each getting its own SQLite database — occasionally causing one test file's data to leak into or overwrite another's. Added `tests/conftest.py` to re-apply each test module's own data directory (and `CYAN_DATA_DIR` env var) immediately before its tests run. Full suite: 46/48 passing (the remaining 2 require a live agent process running with an authenticated session and aren't runnable as plain unit tests).
+
+---
+
 # Cyan Server v0.7.3 Release Notes
 
 **Cyan Server v0.7.3** delivers critical stability and UX enhancements:

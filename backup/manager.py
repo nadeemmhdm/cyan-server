@@ -23,7 +23,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from core.database import BackupConfig, get_session, DB_PATH
+import core.database as _core_db
+from core.database import BackupConfig, get_session
 
 def _data_dir() -> Path:
     """Re-read CYAN_DATA_DIR on every call — see web/manager.py's
@@ -71,7 +72,7 @@ def _safe_sqlite_snapshot(dest_path: Path) -> None:
     directly — a raw file copy taken mid-write can capture a torn/corrupt
     page; the backup API produces a consistent snapshot regardless of
     concurrent writes from the live agent."""
-    src = sqlite3.connect(str(DB_PATH))
+    src = sqlite3.connect(str(_core_db.DB_PATH))
     dst = sqlite3.connect(str(dest_path))
     try:
         src.backup(dst)

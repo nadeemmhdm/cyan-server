@@ -14,6 +14,10 @@ from pathlib import Path
 os.environ["CYAN_DATA_DIR"] = tempfile.mkdtemp(prefix="cyan-v072-test-")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import core.database as _core_db  # noqa: E402
+_TEST_DATA_DIR = os.environ["CYAN_DATA_DIR"]  # read by conftest.py's per-module fixture
+_core_db.configure()  # fresh engine for this test file's CYAN_DATA_DIR -- see
+# core/database.py:configure() docstring for why this is required
 from core.database import init_db, get_session, User, ApiKey  # noqa: E402
 init_db()
 
