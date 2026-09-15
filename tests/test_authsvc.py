@@ -403,6 +403,50 @@ def test_api_key_cannot_see_another_projects_users():
         pass
 
 
+def test_admin_user_management_list_disable_reset_delete():
+    proj = _new_project_with_smtp()
+    authsvc.register_user(proj["api_key"], "oscar@customer.com", "Str0ng!Passw0rd")
+    otp = _latest_email_otp()
+    authsvc.verify_email_otp(proj["api_key"], "oscar@customer.com", otp)
+
+    users = authsvc.list_users(proj["project_id"])
+    assert len(users) == 1
+    u = users[0]
+    assert u["email"] == "oscar@customer.com"
+    assert 12 <= len(u["user_id"]) <= 15
+    assert u["email_verified"] is True
+    assert u["verification_method"] == "otp"
+    assert u["disabled"] is False
+    user_id = u["user_id"]
+
+    # Disable blocks login.
+    authsvc.admin_disable_user(proj["project_id"], user_id, True)
+    try:
+        authsvc.login(proj["api_key"], "oscar@customer.com", "Str0ng!Passw0rd")
+        assert False, "disabled account should not be able to log in"
+    except authsvc.AuthSvcError as e:
+        assert "disabled" in str(e).lower()
+
+    # Re-enable restores login.
+    authsvc.admin_disable_user(proj["project_id"], user_id, False)
+    authsvc.login(proj["api_key"], "oscar@customer.com", "Str0ng!Passw0rd")
+
+    # Admin-triggered password reset sends a real email the user can act on.
+    authsvc.admin_send_password_reset(proj["project_id"], user_id)
+    reset_otp = _latest_email_otp()
+    authsvc.reset_password(proj["api_key"], "oscar@customer.com", reset_otp, "AdminReset!Pass9")
+    authsvc.login(proj["api_key"], "oscar@customer.com", "AdminReset!Pass9")
+
+    # Delete removes the account entirely.
+    authsvc.admin_delete_user(proj["project_id"], user_id)
+    assert authsvc.list_users(proj["project_id"]) == []
+    try:
+        authsvc.login(proj["api_key"], "oscar@customer.com", "AdminReset!Pass9")
+        assert False, "deleted account should no longer be able to log in"
+    except authsvc.AuthSvcError:
+        pass
+
+
 if __name__ == "__main__":
     test_create_project_returns_key_once_and_seeds_templates()
     test_smtp_verification_rejects_wrong_credentials()

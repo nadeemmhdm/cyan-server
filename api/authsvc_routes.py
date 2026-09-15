@@ -167,6 +167,51 @@ def update_template(project_id: str, template_type: str, req: UpdateTemplateRequ
 
 
 # ---------------------------------------------------------------------------
+# Admin: end-user management — list a project's registered users and act
+# on individual accounts. Admin-authenticated, like project management above.
+# ---------------------------------------------------------------------------
+
+@router.get("/projects/{project_id}/users")
+def list_users(project_id: str, _=Depends(require_auth)):
+    try:
+        return authsvc.list_users(project_id)
+    except authsvc.AuthSvcError as e:
+        raise HTTPException(404, str(e))
+
+
+@router.delete("/projects/{project_id}/users/{user_id}")
+def delete_user(project_id: str, user_id: str, _=Depends(require_auth)):
+    try:
+        return authsvc.admin_delete_user(project_id, user_id)
+    except authsvc.AuthSvcError as e:
+        raise HTTPException(404, str(e))
+
+
+class DisableUserRequest(BaseModel):
+    disabled: bool = True
+
+
+@router.post("/projects/{project_id}/users/{user_id}/disable")
+def disable_user(project_id: str, user_id: str, req: DisableUserRequest, _=Depends(require_auth)):
+    try:
+        return authsvc.admin_disable_user(project_id, user_id, req.disabled)
+    except authsvc.AuthSvcError as e:
+        raise HTTPException(404, str(e))
+
+
+class AdminResetRequest(BaseModel):
+    base_link_url: str | None = None
+
+
+@router.post("/projects/{project_id}/users/{user_id}/send-password-reset")
+def admin_send_password_reset(project_id: str, user_id: str, req: AdminResetRequest, _=Depends(require_auth)):
+    try:
+        return authsvc.admin_send_password_reset(project_id, user_id, req.base_link_url)
+    except authsvc.AuthSvcError as e:
+        raise HTTPException(404, str(e))
+
+
+# ---------------------------------------------------------------------------
 # Public, API-key-scoped endpoints — called by whatever app/site is using
 # this project's authentication, on behalf of ITS end users. No admin auth;
 # the API key itself is the credential. Rate-limited per source IP.

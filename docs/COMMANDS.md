@@ -453,6 +453,35 @@ Body file can use `{{otp}}`, `{{link}}`, `{{email}}`, `{{project_name}}`, `{{ttl
 cyan auth template-edit proj_ab12cd34 email_verify --subject "Confirm your account" --body-file verify.html
 ```
 
+### `cyan auth users <project_id>`
+List a project's registered end users — email, unique user ID (14
+chars, copyable), verified status/method, disabled/locked state.
+```bash
+cyan auth users proj_ab12cd34
+```
+
+### `cyan auth user-disable <project_id> <user_id>` / `user-enable`
+Disable or re-enable an account without deleting it. A disabled
+account is blocked at login immediately.
+```bash
+cyan auth user-disable proj_ab12cd34 a1b2c3d4e5f601
+cyan auth user-enable proj_ab12cd34 a1b2c3d4e5f601
+```
+
+### `cyan auth user-reset-password <project_id> <user_id>`
+Send a password-reset email to this user (link + OTP), same as if
+they'd requested it themselves.
+```bash
+cyan auth user-reset-password proj_ab12cd34 a1b2c3d4e5f601
+```
+
+### `cyan auth user-delete <project_id> <user_id> [--yes]`
+Permanently delete an end user's account. Prompts for confirmation
+unless `--yes` is passed.
+```bash
+cyan auth user-delete proj_ab12cd34 a1b2c3d4e5f601
+```
+
 ### Security notes on the emailed links
 - Every link token is **single-use** and stored only as a SHA-256 hash —
   a database leak alone can never yield a working link.
@@ -485,4 +514,12 @@ GET  /api/authsvc/reset-password        ?token=...                   (the emaile
 POST /api/authsvc/email-change/request  { session_token, new_email, base_link_url? }
 POST /api/authsvc/email-change/confirm-otp  { session_token, otp }
 GET  /api/authsvc/confirm-email-change  ?token=...                   (the emailed link — HTML page)
+```
+
+### Admin: user management (admin-authenticated, like project management above)
+```
+GET    /api/authsvc/projects/{project_id}/users
+DELETE /api/authsvc/projects/{project_id}/users/{user_id}
+POST   /api/authsvc/projects/{project_id}/users/{user_id}/disable            { disabled }
+POST   /api/authsvc/projects/{project_id}/users/{user_id}/send-password-reset
 ```

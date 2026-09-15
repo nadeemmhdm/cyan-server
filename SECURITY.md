@@ -59,6 +59,11 @@ disclosure timeline.
     API key or session token for project A can never resolve or act on
     project B's rows, even with a matching email address — covered by
     an explicit cross-project test.
+  - Each user has a 14-character public ID (`cyan auth users
+    <project_id>`) distinct from the internal database ID, for admin
+    reference/copy without exposing row numbers. Admin actions —
+    disable, re-enable, send password reset, permanently delete — are
+    all scoped to one project and act on this public ID.
 - Optional TOTP two-factor authentication per user, on top of the
   password/JWT flow below.
 - Sessions: JWT, 12-hour expiry, signed with a per-install secret generated

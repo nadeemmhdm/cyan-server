@@ -1293,11 +1293,72 @@ def authsvc_template_edit(project_id: str, template_type: str,
                            body_file: str = typer.Option(..., "--body-file",
                                                           help="Path to an HTML file with the email body. "
                                                                "Use {{otp}}, {{link}}, {{email}}, {{project_name}}, {{ttl_minutes}}.")):
-    """Edit a project's email template. template_type: email_verify | password_reset"""
+    """Edit a project's email template. template_type: email_verify | password_reset | email_change | mfa_login"""
     body_html = Path(body_file).read_text()
     _agent_post(f"/api/authsvc/projects/{project_id}/templates/{template_type}",
                 {"subject": subject, "body_html": body_html}, auth=True, method="PUT")
     console.print(f"[green]✓ Template '{template_type}' updated for '{project_id}'[/green]")
+
+
+@auth_svc_app.command("users")
+def authsvc_users(project_id: str):
+    """List a project's registered end users — email, unique user ID,
+    verification status/method, disabled/locked state."""
+    users = _agent_get(f"/api/authsvc/projects/{project_id}/users", auth=True)
+    if not users:
+        console.print("[yellow]No users registered in this project yet.[/yellow]")
+        return
+    table = Table(title=f"Users — {project_id}", border_style="cyan")
+    for col in ("User ID", "Email", "Verified", "Method", "Disabled", "Locked", "Created"):
+        table.add_column(col)
+    for u in users:
+        table.add_row(
+            u["user_id"], u["email"],
+            "✓" if u["email_verified"] else "✗",
+            u["verification_method"] or "—",
+            "✓" if u["disabled"] else "✗",
+            "✓" if u["locked"] else "✗",
+            (u["created_at"] or "")[:19],
+        )
+    console.print(table)
+    console.print("[dim]Copy a User ID and use it with: "
+                  "cyan auth user-disable / user-enable / user-reset-password / user-delete[/dim]")
+
+
+@auth_svc_app.command("user-disable")
+def authsvc_user_disable(project_id: str, user_id: str):
+    """Disable an account — blocks login immediately, without deleting the account."""
+    result = _agent_post(f"/api/authsvc/projects/{project_id}/users/{user_id}/disable",
+                          {"disabled": True}, auth=True)
+    console.print(f"[green]✓ '{result['email']}' ({user_id}) disabled[/green]")
+
+
+@auth_svc_app.command("user-enable")
+def authsvc_user_enable(project_id: str, user_id: str):
+    """Re-enable a previously disabled account."""
+    result = _agent_post(f"/api/authsvc/projects/{project_id}/users/{user_id}/disable",
+                          {"disabled": False}, auth=True)
+    console.print(f"[green]✓ '{result['email']}' ({user_id}) re-enabled[/green]")
+
+
+@auth_svc_app.command("user-reset-password")
+def authsvc_user_reset_password(project_id: str, user_id: str):
+    """Send a password-reset email to this user (link + OTP), same as if
+    they'd requested it themselves."""
+    result = _agent_post(f"/api/authsvc/projects/{project_id}/users/{user_id}/send-password-reset",
+                          {}, auth=True)
+    console.print(f"[green]✓ Password-reset email sent to '{result['email']}'[/green]")
+
+
+@auth_svc_app.command("user-delete")
+def authsvc_user_delete(project_id: str, user_id: str,
+                         yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt.")):
+    """Permanently delete an end user's account. Cannot be undone."""
+    if not yes and not typer.confirm(f"Permanently delete user '{user_id}' in '{project_id}'?"):
+        raise typer.Abort()
+    result = _agent_post(f"/api/authsvc/projects/{project_id}/users/{user_id}", None,
+                          auth=True, method="DELETE")
+    console.print(f"[green]✓ Deleted '{result['email']}' ({user_id})[/green]")
 
 
 if __name__ == "__main__":

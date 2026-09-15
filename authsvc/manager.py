@@ -119,6 +119,12 @@ def _generate_project_id() -> str:
     return f"proj_{secrets.token_hex(8)}"
 
 
+def _generate_user_public_id() -> str:
+    """14 hex chars — within the requested 12-15 length range, and short
+    enough to read/copy comfortably while still effectively collision-free."""
+    return secrets.token_hex(7)
+
+
 # ---------------------------------------------------------------------------
 # Password policy — "secure password only"
 # ---------------------------------------------------------------------------
@@ -545,7 +551,12 @@ def register_user(api_key: str, email: str, password: str, base_link_url: str | 
         if existing:
             raise AuthSvcError("An account with this email already exists")
 
-        user = AuthEndUser(project_id=project.id, email=email, password_hash=hash_password(password),
+        public_id = _generate_user_public_id()
+        while session.query(AuthEndUser).filter_by(public_id=public_id).first():
+            public_id = _generate_user_public_id()  # practically never happens; belt and suspenders
+
+        user = AuthEndUser(public_id=public_id, project_id=project.id, email=email,
+                            password_hash=hash_password(password),
                             email_verified=not project.require_email_verification)
         session.add(user)
         session.commit()
@@ -560,6 +571,7 @@ def register_user(api_key: str, email: str, password: str, base_link_url: str | 
 
         return {
             "email": user.email,
+            "user_id": user.public_id,
             "email_verification_required": project.require_email_verification,
             "email_sent": email_sent,
             "status": "pending_verification" if project.require_email_verification else "active",
@@ -606,6 +618,7 @@ def verify_email_token(token: str) -> dict:
         user = session.query(AuthEndUser).filter_by(id=v.user_id).first()
         v.consumed = True
         user.email_verified = True
+        user.verification_method = "link"
         session.commit()
         return {"email": user.email, "verified": True}
     finally:
@@ -679,6 +692,9 @@ def login(api_key: str, email: str, password: str) -> dict:
         if not user:
             verify_password(password, dummy_hash)
             raise InvalidCredentials("Invalid email or password")
+
+        if user.disabled:
+            raise AuthSvcError("This account has been disabled")
 
         if user.locked_until and user.locked_until > utcnow():
             raise AccountLocked((user.locked_until - utcnow()).total_seconds())
@@ -757,6 +773,7 @@ def verify_email_otp(api_key: str, email: str, otp: str) -> dict:
             raise AuthSvcError("Invalid or expired code")
         v.consumed = True
         user.email_verified = True
+        user.verification_method = "otp"
         session.commit()
         return {"email": user.email, "verified": True}
     finally:
@@ -907,5 +924,88 @@ def confirm_email_change_otp(session_token: str, otp: str) -> dict:
         user.email = v.new_email
         session.commit()
         return {"email": user.email, "email_changed": True}
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
+# Admin: end-user management — the dashboard/CLI view of a project's
+# registered users, with account actions. All admin-authenticated
+# (require_auth at the API layer), scoped to one project throughout.
+# ---------------------------------------------------------------------------
+
+def _user_summary(user: AuthEndUser) -> dict:
+    locked = bool(user.locked_until and user.locked_until > utcnow())
+    return {
+        "user_id": user.public_id,
+        "email": user.email,
+        "email_verified": user.email_verified,
+        "verification_method": user.verification_method,  # otp | link | None (not yet verified)
+        "disabled": user.disabled,
+        "locked": locked,
+        "locked_until": user.locked_until.isoformat() if locked else None,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
+
+
+def list_users(project_id: str) -> list[dict]:
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, project_id)
+        users = session.query(AuthEndUser).filter_by(project_id=project.id) \
+            .order_by(AuthEndUser.created_at.desc()).all()
+        return [_user_summary(u) for u in users]
+    finally:
+        session.close()
+
+
+def _get_user_by_public_id(session, project: AuthProject, user_id: str) -> AuthEndUser:
+    user = session.query(AuthEndUser).filter_by(project_id=project.id, public_id=user_id).first()
+    if not user:
+        raise AuthSvcError(f"No user '{user_id}' in project '{project.project_id}'")
+    return user
+
+
+def admin_delete_user(project_id: str, user_id: str) -> dict:
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, project_id)
+        user = _get_user_by_public_id(session, project, user_id)
+        # Verification rows reference user_id via a FK with no cascade
+        # configured at the DB level — clean them up explicitly so a
+        # deleted account doesn't leave orphaned rows another user's
+        # public_id could theoretically collide into later.
+        session.query(AuthVerification).filter_by(user_id=user.id).delete()
+        email = user.email
+        session.delete(user)
+        session.commit()
+        return {"user_id": user_id, "email": email, "deleted": True}
+    finally:
+        session.close()
+
+
+def admin_disable_user(project_id: str, user_id: str, disabled: bool) -> dict:
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, project_id)
+        user = _get_user_by_public_id(session, project, user_id)
+        user.disabled = disabled
+        session.commit()
+        return {"user_id": user_id, "email": user.email, "disabled": disabled}
+    finally:
+        session.close()
+
+
+def admin_send_password_reset(project_id: str, user_id: str, base_link_url: str | None = None) -> dict:
+    """Same delivery mechanism as forgot_password(), triggered from the
+    dashboard/CLI by an admin rather than requested by the end user."""
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, project_id)
+        user = _get_user_by_public_id(session, project, user_id)
+        verification, raw_token = _issue_verification(session, project, user, "password_reset")
+        _deliver_verification(session, project, user, raw_token, verification.otp_code,
+                               "password_reset", base_link_url)
+        return {"user_id": user_id, "email": user.email, "email_sent": True}
     finally:
         session.close()

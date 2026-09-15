@@ -214,10 +214,13 @@ class AuthSMTPConfig(Base):
 class AuthEndUser(Base):
     __tablename__ = "auth_end_users"
     id = Column(Integer, primary_key=True)
+    public_id = Column(String, unique=True, nullable=False, index=True)  # 12-15 char id shown in dashboard/CLI
     project_id = Column(Integer, ForeignKey("auth_projects.id"), nullable=False, index=True)
     email = Column(String, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
     email_verified = Column(Boolean, default=False)
+    verification_method = Column(String, nullable=True)  # otp | link — how they last verified, for display
+    disabled = Column(Boolean, default=False)
     failed_attempts = Column(Integer, default=0)
     lockout_count = Column(Integer, default=0)          # how many times this account has been locked — drives progressive backoff
     locked_until = Column(DateTime, nullable=True)
