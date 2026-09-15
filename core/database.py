@@ -190,6 +190,7 @@ class AuthProject(Base):
     api_key_hash = Column(String, nullable=False)      # sha256 of the real key — raw key is shown once, at creation
     api_key_prefix = Column(String, nullable=False)     # short prefix shown in listings, e.g. ck_live_ab12
     require_email_verification = Column(Boolean, default=True)
+    mfa_enabled = Column(Boolean, default=False)         # require an email OTP second factor at login
     password_min_length = Column(Integer, default=10)
     max_login_attempts = Column(Integer, default=5)
     lockout_minutes = Column(Integer, default=15)
@@ -227,9 +228,12 @@ class AuthVerification(Base):
     __tablename__ = "auth_verifications"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("auth_end_users.id"), nullable=False, index=True)
-    purpose = Column(String, nullable=False)   # email_verify | password_reset
-    token = Column(String, unique=True, nullable=False, index=True)  # for the link
+    purpose = Column(String, nullable=False)   # email_verify | password_reset | email_change | mfa_login
+    token = Column(String, unique=True, nullable=False, index=True)  # sha256 hash of the real link token —
+                                                                       # the raw token is only ever returned once,
+                                                                       # in the email itself, never persisted
     otp_code = Column(String, nullable=False)                          # 6-digit, for the OTP path
+    new_email = Column(String, nullable=True)   # pending new address, only set for purpose=email_change
     expires_at = Column(DateTime, nullable=False)
     consumed = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utcnow)

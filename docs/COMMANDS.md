@@ -429,36 +429,60 @@ app password if not piped in; performs a real SMTP login before saving.
 cyan auth smtp proj_ab12cd34 --host smtp.gmail.com --port 587 --email sender@example.com
 ```
 
-### `cyan auth policy <project_id> [--require-verification/--no-require-verification] [--password-min-length N] [--max-login-attempts N] [--lockout-minutes N]`
+### `cyan auth policy <project_id> [--require-verification/--no-require-verification] [--password-min-length N] [--max-login-attempts N] [--lockout-minutes N] [--mfa/--no-mfa]`
 Update a project's security policy — password strength requirement,
-whether email verification is mandatory before login, and the
-attempt-based cooldown thresholds.
+whether email verification is mandatory before login, attempt-based
+cooldown thresholds, and MFA. `--mfa` requires SMTP already configured
+(the one-time code has to be emailed somewhere).
 ```bash
 cyan auth policy proj_ab12cd34 --password-min-length 12 --max-login-attempts 3 --lockout-minutes 30
+cyan auth policy proj_ab12cd34 --mfa
 ```
 
 ### `cyan auth template-show <project_id>`
-Show the current `email_verify` and `password_reset` templates.
+Show the current templates: `email_verify`, `password_reset`, `email_change`, `mfa_login`.
 ```bash
 cyan auth template-show proj_ab12cd34
 ```
 
 ### `cyan auth template-edit <project_id> <template_type> --subject "..." --body-file body.html`
-Edit an email template. `template_type`: `email_verify` | `password_reset`.
-Body file can use `{{otp}}`, `{{link}}`, `{{email}}`, `{{project_name}}`, `{{ttl_minutes}}`.
+Edit an email template. `template_type`: `email_verify` | `password_reset` | `email_change` | `mfa_login`.
+Body file can use `{{otp}}`, `{{link}}`, `{{email}}`, `{{project_name}}`, `{{ttl_minutes}}`
+(`mfa_login` has no `{{link}}` — it's code-only, entered back into your app).
 ```bash
 cyan auth template-edit proj_ab12cd34 email_verify --subject "Confirm your account" --body-file verify.html
 ```
+
+### Security notes on the emailed links
+- Every link token is **single-use** and stored only as a SHA-256 hash —
+  a database leak alone can never yield a working link.
+- The password-reset and email-verify links carry **only the token**, no
+  API key — a leaked/forwarded link can act on that one account and
+  nothing else.
+- Clicking a reset-password link never resets anything by itself (a bare
+  GET just shows a form); the actual change requires the POST.
+- A GET click that verifies an email or confirms an email change shows
+  a default success/failure page — no separate frontend needed to handle
+  the click, though you can pass `base_link_url` at register/forgot-
+  password/email-change time to point the link at your own app instead.
 
 ### API surface (used by your own app, not the Cyan Server admin)
 Everything below takes the project's `api_key`, not an admin login —
 it's what your app's signup/login forms call.
 ```
-POST /api/authsvc/register            { api_key, email, password }
-POST /api/authsvc/verify-otp          { api_key, email, otp }
-POST /api/authsvc/verify-email        { token }                    (the link path)
-POST /api/authsvc/resend-verification { api_key, email }
-POST /api/authsvc/login               { api_key, email, password } -> session_token (JWT, 12h)
-POST /api/authsvc/forgot-password     { api_key, email }
-POST /api/authsvc/reset-password      { api_key, email, code, new_password }
+POST /api/authsvc/register              { api_key, email, password, base_link_url? }
+POST /api/authsvc/verify-otp            { api_key, email, otp }
+GET  /api/authsvc/verify-email          ?token=...                   (the emailed link — HTML page)
+POST /api/authsvc/verify-email          { token }                    (JSON alternative)
+POST /api/authsvc/resend-verification   { api_key, email }
+POST /api/authsvc/login                 { api_key, email, password }
+                                           -> { session_token, ... } normally, or
+                                           -> { mfa_required: true, preauth_token } if MFA is on
+POST /api/authsvc/mfa-verify            { preauth_token, otp } -> { session_token, ... }
+POST /api/authsvc/forgot-password       { api_key, email, base_link_url? }
+POST /api/authsvc/reset-password        { api_key, email, otp, new_password }     (OTP path)
+GET  /api/authsvc/reset-password        ?token=...                   (the emailed link — HTML form)
+POST /api/authsvc/email-change/request  { session_token, new_email, base_link_url? }
+POST /api/authsvc/email-change/confirm-otp  { session_token, otp }
+GET  /api/authsvc/confirm-email-change  ?token=...                   (the emailed link — HTML page)
 ```

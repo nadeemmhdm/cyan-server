@@ -1223,12 +1223,13 @@ def authsvc_project_list():
         console.print("[yellow]No auth projects yet.[/yellow] Run: [bold]cyan auth project-create <name>[/bold]")
         return
     table = Table(title="Auth Service Projects", border_style="cyan")
-    for col in ("Project ID", "Name", "API Key", "SMTP", "Verify email?", "Min pw len", "Max attempts", "Lockout (min)"):
+    for col in ("Project ID", "Name", "API Key", "SMTP", "Verify email?", "MFA", "Min pw len", "Max attempts", "Lockout (min)"):
         table.add_column(col)
     for p in projects:
         table.add_row(p["project_id"], p["name"], p["api_key_prefix"],
                        "✓" if p["smtp_configured"] else "✗",
                        "✓" if p["require_email_verification"] else "✗",
+                       "✓" if p.get("mfa_enabled") else "✗",
                        str(p["password_min_length"]), str(p["max_login_attempts"]),
                        str(p["lockout_minutes"]))
     console.print(table)
@@ -1259,14 +1260,18 @@ def authsvc_policy(project_id: str,
                     require_email_verification: bool = typer.Option(None, "--require-verification/--no-require-verification"),
                     password_min_length: int = typer.Option(None, "--password-min-length"),
                     max_login_attempts: int = typer.Option(None, "--max-login-attempts"),
-                    lockout_minutes: int = typer.Option(None, "--lockout-minutes")):
+                    lockout_minutes: int = typer.Option(None, "--lockout-minutes"),
+                    mfa_enabled: bool = typer.Option(None, "--mfa/--no-mfa",
+                                                      help="Require an emailed one-time code as a second "
+                                                           "factor at login. Needs SMTP configured first.")):
     """Update a project's security policy: password length, verification
-    requirement, and attempt-based cooldown/lockout settings."""
+    requirement, attempt-based cooldown/lockout settings, and MFA."""
     payload = {k: v for k, v in {
         "require_email_verification": require_email_verification,
         "password_min_length": password_min_length,
         "max_login_attempts": max_login_attempts,
         "lockout_minutes": lockout_minutes,
+        "mfa_enabled": mfa_enabled,
     }.items() if v is not None}
     _agent_post(f"/api/authsvc/projects/{project_id}/policy", payload, auth=True, method="PUT")
     console.print(f"[green]✓ Policy updated for '{project_id}'[/green]")

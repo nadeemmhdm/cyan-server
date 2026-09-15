@@ -163,7 +163,8 @@ def _default_templates() -> dict[str, dict[str, str]]:
                 "<p>Confirm your email for <b>{{project_name}}</b> using either option below:</p>"
                 "<p><a href=\"{{link}}\">Click here to verify your email</a></p>"
                 "<p>Or enter this one-time code: <b style=\"font-size:20px;letter-spacing:4px\">{{otp}}</b></p>"
-                "<p>This code/link expires in {{ttl_minutes}} minutes. If you didn't request this, ignore it.</p>"
+                "<p>This code/link expires in {{ttl_minutes}} minutes and can only be used once. "
+                "If you didn't request this, ignore it.</p>"
             ),
         },
         "password_reset": {
@@ -173,8 +174,30 @@ def _default_templates() -> dict[str, dict[str, str]]:
                 "<p>Reset your password for <b>{{project_name}}</b> using either option below:</p>"
                 "<p><a href=\"{{link}}\">Click here to reset your password</a></p>"
                 "<p>Or enter this one-time code: <b style=\"font-size:20px;letter-spacing:4px\">{{otp}}</b></p>"
-                "<p>This code/link expires in {{ttl_minutes}} minutes. If you didn't request this, "
-                "your password is still safe — just ignore this email.</p>"
+                "<p>This code/link expires in {{ttl_minutes}} minutes and can only be used once. "
+                "If you didn't request this, your password is still safe — just ignore this email.</p>"
+            ),
+        },
+        "email_change": {
+            "subject": "Confirm your new email for {{project_name}}",
+            "body_html": (
+                "<p>Hi,</p>"
+                "<p>Confirm this address as your new login email for <b>{{project_name}}</b>:</p>"
+                "<p><a href=\"{{link}}\">Click here to confirm your new email</a></p>"
+                "<p>Or enter this one-time code in the app: <b style=\"font-size:20px;letter-spacing:4px\">{{otp}}</b></p>"
+                "<p>This code/link expires in {{ttl_minutes}} minutes and can only be used once. "
+                "If you didn't request this change, your email is unchanged — just ignore this message.</p>"
+            ),
+        },
+        "mfa_login": {
+            "subject": "Your {{project_name}} sign-in code",
+            "body_html": (
+                "<p>Hi,</p>"
+                "<p>Someone is signing in to your <b>{{project_name}}</b> account. "
+                "Enter this code to finish signing in:</p>"
+                "<p><b style=\"font-size:20px;letter-spacing:4px\">{{otp}}</b></p>"
+                "<p>This code expires in {{ttl_minutes}} minutes and can only be used once. "
+                "If this wasn't you, change your password immediately.</p>"
             ),
         },
     }
@@ -236,6 +259,7 @@ def list_projects() -> list[dict]:
             "project_id": p.project_id, "name": p.name, "description": p.description,
             "api_key_prefix": p.api_key_prefix,
             "require_email_verification": p.require_email_verification,
+            "mfa_enabled": p.mfa_enabled,
             "password_min_length": p.password_min_length,
             "max_login_attempts": p.max_login_attempts,
             "lockout_minutes": p.lockout_minutes,
@@ -261,15 +285,41 @@ def _get_project_by_api_key(session, raw_key: str) -> AuthProject:
     return project
 
 
+def _get_user_in_project(session, project: AuthProject, *, email: str | None = None,
+                          user_id: int | None = None) -> AuthEndUser | None:
+    """The one place any end-user row is ever fetched by email or id — every
+    call site MUST go through here rather than querying AuthEndUser
+    directly, so a project_id filter can never be forgotten in a future
+    change. This is the application-layer row-level security boundary:
+    a project's API key, session token, or admin session can only ever
+    resolve rows that also match project.id, however the row was looked
+    up. (The one exception is token-based verification lookups, where the
+    single-use token itself — not project_id — is the scoping credential;
+    those still resolve the owning project from the row afterward rather
+    than accepting one as input, so a token from project A can never be
+    replayed as if it belonged to project B.)"""
+    q = session.query(AuthEndUser).filter_by(project_id=project.id)
+    if email is not None:
+        q = q.filter_by(email=email)
+    if user_id is not None:
+        q = q.filter_by(id=user_id)
+    return q.first()
+
+
 def update_project_policy(project_id: str, require_email_verification: bool | None = None,
                            password_min_length: int | None = None,
                            max_login_attempts: int | None = None,
-                           lockout_minutes: int | None = None) -> dict:
+                           lockout_minutes: int | None = None,
+                           mfa_enabled: bool | None = None) -> dict:
     session = get_session()
     try:
         project = _get_project_by_project_id(session, project_id)
         if require_email_verification is not None:
             project.require_email_verification = require_email_verification
+        if mfa_enabled is not None:
+            if mfa_enabled and not session.query(AuthSMTPConfig).filter_by(project_id=project.id).first():
+                raise AuthSvcError("Configure SMTP before enabling MFA — the OTP has to be emailed somewhere")
+            project.mfa_enabled = mfa_enabled
         if password_min_length is not None:
             if password_min_length < 8:
                 raise AuthSvcError("password_min_length must be at least 8")
@@ -391,8 +441,8 @@ def get_templates(project_id: str) -> list[dict]:
 
 
 def update_template(project_id: str, template_type: str, subject: str, body_html: str) -> dict:
-    if template_type not in ("email_verify", "password_reset"):
-        raise AuthSvcError("template_type must be 'email_verify' or 'password_reset'")
+    if template_type not in ("email_verify", "password_reset", "email_change", "mfa_login"):
+        raise AuthSvcError("template_type must be one of: email_verify, password_reset, email_change, mfa_login")
     session = get_session()
     try:
         project = _get_project_by_project_id(session, project_id)
@@ -425,36 +475,56 @@ def _get_template(session, project: AuthProject, template_type: str) -> AuthEmai
 # Verification (link + OTP), issued together so either path works
 # ---------------------------------------------------------------------------
 
-def _issue_verification(session, project: AuthProject, user: AuthEndUser, purpose: str) -> AuthVerification:
+def _hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+
+def _issue_verification(session, project: AuthProject, user: AuthEndUser, purpose: str,
+                         new_email: str | None = None) -> tuple[AuthVerification, str]:
+    """Returns (row, raw_token). Only the HASH of the token is ever
+    persisted — the raw value exists only in memory here and in the
+    email sent to the user, so a database leak alone can never yield a
+    working verification link."""
     # Invalidate any outstanding, unconsumed verification of the same purpose
     # for this user first, so an old link/OTP can't be replayed alongside a new one.
     session.query(AuthVerification).filter_by(
         user_id=user.id, purpose=purpose, consumed=False
     ).update({"consumed": True})
 
-    token = secrets.token_urlsafe(32)
+    raw_token = secrets.token_urlsafe(32)
     otp = f"{secrets.randbelow(1_000_000):06d}"
     v = AuthVerification(
-        user_id=user.id, purpose=purpose, token=token, otp_code=otp,
+        user_id=user.id, purpose=purpose, token=_hash_token(raw_token), otp_code=otp,
+        new_email=new_email,
         expires_at=utcnow() + datetime.timedelta(minutes=project.otp_ttl_minutes),
     )
     session.add(v)
     session.commit()
     session.refresh(v)
-    return v
+    return v, raw_token
+
+
+def _find_verification_by_token(session, raw_token: str, purpose: str) -> AuthVerification | None:
+    return session.query(AuthVerification).filter_by(
+        token=_hash_token(raw_token), purpose=purpose, consumed=False).first()
 
 
 def _deliver_verification(session, project: AuthProject, user: AuthEndUser,
-                           verification: AuthVerification, purpose: str,
-                           base_link_url: str | None) -> None:
+                           raw_token: str, otp_code: str, purpose: str,
+                           base_link_url: str | None, to_email: str | None = None) -> None:
     cfg = _get_smtp_config(session, project)
     template = _get_template(session, project, purpose)
-    link = f"{(base_link_url or '').rstrip('/')}/verify?token={verification.token}" if base_link_url \
-        else f"cyan://authsvc/verify?token={verification.token}"
+    page = {"email_verify": "verify-email", "password_reset": "reset-password",
+            "email_change": "confirm-email-change"}.get(purpose)
+    if page:
+        link = f"{(base_link_url or '').rstrip('/')}/api/authsvc/{page}?token={raw_token}" if base_link_url \
+            else f"cyan://authsvc/{page}?token={raw_token}"
+    else:
+        link = ""   # mfa_login has no clickable link — code-only, entered back into the app
     subject = _render(template.subject, project_name=project.name)
-    body = _render(template.body_html, project_name=project.name, otp=verification.otp_code,
+    body = _render(template.body_html, project_name=project.name, otp=otp_code,
                     link=link, email=user.email, ttl_minutes=project.otp_ttl_minutes)
-    _send_email(cfg, user.email, subject, body)
+    _send_email(cfg, to_email or user.email, subject, body)
 
 
 # ---------------------------------------------------------------------------
@@ -471,7 +541,7 @@ def register_user(api_key: str, email: str, password: str, base_link_url: str | 
         project = _get_project_by_api_key(session, api_key)
         validate_password_strength(password, project.password_min_length, email=email)
 
-        existing = session.query(AuthEndUser).filter_by(project_id=project.id, email=email).first()
+        existing = _get_user_in_project(session, project, email=email)
         if existing:
             raise AuthSvcError("An account with this email already exists")
 
@@ -483,8 +553,9 @@ def register_user(api_key: str, email: str, password: str, base_link_url: str | 
 
         email_sent = False
         if project.require_email_verification:
-            verification = _issue_verification(session, project, user, "email_verify")
-            _deliver_verification(session, project, user, verification, "email_verify", base_link_url)
+            verification, raw_token = _issue_verification(session, project, user, "email_verify")
+            _deliver_verification(session, project, user, raw_token, verification.otp_code,
+                                   "email_verify", base_link_url)
             email_sent = True
 
         return {
@@ -502,7 +573,7 @@ def resend_verification(api_key: str, email: str, base_link_url: str | None = No
     session = get_session()
     try:
         project = _get_project_by_api_key(session, api_key)
-        user = session.query(AuthEndUser).filter_by(project_id=project.id, email=email).first()
+        user = _get_user_in_project(session, project, email=email)
         if not user:
             # Same response either way — don't leak whether an email is registered.
             return {"email_sent": True}
@@ -515,55 +586,46 @@ def resend_verification(api_key: str, email: str, base_link_url: str | None = No
         if latest and (utcnow() - latest.created_at).total_seconds() < 60:
             raise AuthSvcError("Please wait at least 60 seconds between resend requests")
 
-        verification = _issue_verification(session, project, user, "email_verify")
-        _deliver_verification(session, project, user, verification, "email_verify", base_link_url)
+        verification, raw_token = _issue_verification(session, project, user, "email_verify")
+        _deliver_verification(session, project, user, raw_token, verification.otp_code,
+                               "email_verify", base_link_url)
         return {"email_sent": True}
     finally:
         session.close()
 
 
 def verify_email_token(token: str) -> dict:
+    """Single-use: the row is marked consumed in the same transaction that
+    checks it, so a link opened twice (browser prefetch, email scanners,
+    a second click) only succeeds once."""
     session = get_session()
     try:
-        v = session.query(AuthVerification).filter_by(
-            token=token, purpose="email_verify", consumed=False).first()
+        v = _find_verification_by_token(session, token, "email_verify")
         if not v or v.expires_at < utcnow():
-            raise AuthSvcError("Verification link is invalid or has expired")
+            raise AuthSvcError("Verification link is invalid, already used, or has expired")
         user = session.query(AuthEndUser).filter_by(id=v.user_id).first()
-        user.email_verified = True
         v.consumed = True
+        user.email_verified = True
         session.commit()
         return {"email": user.email, "verified": True}
     finally:
         session.close()
 
 
-def verify_email_otp(api_key: str, email: str, otp: str) -> dict:
-    email = (email or "").strip().lower()
-    session = get_session()
-    try:
-        project = _get_project_by_api_key(session, api_key)
-        user = session.query(AuthEndUser).filter_by(project_id=project.id, email=email).first()
-        if not user:
-            raise AuthSvcError("Invalid code")
-        v = session.query(AuthVerification).filter_by(
-            user_id=user.id, purpose="email_verify", consumed=False
-        ).order_by(AuthVerification.created_at.desc()).first()
-        if not v or v.expires_at < utcnow() or not secrets.compare_digest(v.otp_code, (otp or "").strip()):
-            raise AuthSvcError("Invalid or expired code")
-        user.email_verified = True
-        v.consumed = True
-        session.commit()
-        return {"email": user.email, "verified": True}
-    finally:
-        session.close()
 
 
 # ---------------------------------------------------------------------------
 # Login — real, database-backed progressive lockout (survives restarts,
 # unlike the admin dashboard's in-memory limiter, since these are external
-# end-user accounts that could be targeted over a long period).
+# end-user accounts that could be targeted over a long period). Optional
+# email-OTP second factor: on a project with mfa_enabled, a correct
+# password alone doesn't issue a session — it issues a short-lived
+# pre-auth token and emails a one-time code that must be exchanged for
+# the real session via mfa_verify().
 # ---------------------------------------------------------------------------
+
+PREAUTH_EXPIRY_MINUTES = 5
+
 
 def _issue_session_token(project: AuthProject, user: AuthEndUser) -> str:
     payload = {
@@ -576,6 +638,16 @@ def _issue_session_token(project: AuthProject, user: AuthEndUser) -> str:
     return jwt.encode(payload, _authsvc_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
+def _issue_preauth_token(project: AuthProject, user: AuthEndUser) -> str:
+    payload = {
+        "aud": "authsvc_preauth",
+        "project_id": project.project_id,
+        "sub": str(user.id),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=PREAUTH_EXPIRY_MINUTES),
+    }
+    return jwt.encode(payload, _authsvc_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
 def verify_session_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, _authsvc_jwt_secret(), algorithms=[JWT_ALGORITHM], audience="authsvc")
@@ -584,12 +656,20 @@ def verify_session_token(token: str) -> dict:
     return payload
 
 
+def _verify_preauth_token(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, _authsvc_jwt_secret(), algorithms=[JWT_ALGORITHM], audience="authsvc_preauth")
+    except jwt.PyJWTError:
+        raise AuthSvcError("Sign-in expired — start over")
+    return payload
+
+
 def login(api_key: str, email: str, password: str) -> dict:
     email = (email or "").strip().lower()
     session = get_session()
     try:
         project = _get_project_by_api_key(session, api_key)
-        user = session.query(AuthEndUser).filter_by(project_id=project.id, email=email).first()
+        user = _get_user_in_project(session, project, email=email)
 
         # Constant-shape response whether or not the account exists, to avoid
         # user enumeration — but still needs a bcrypt-shaped comparison so
@@ -627,8 +707,58 @@ def login(api_key: str, email: str, password: str) -> dict:
         user.lockout_count = 0
         session.commit()
 
+        if project.mfa_enabled:
+            verification, raw_otp_unused = _issue_verification(session, project, user, "mfa_login")
+            _deliver_verification(session, project, user, "", verification.otp_code, "mfa_login", None)
+            preauth = _issue_preauth_token(project, user)
+            return {"mfa_required": True, "preauth_token": preauth,
+                    "expires_in_minutes": PREAUTH_EXPIRY_MINUTES}
+
         token = _issue_session_token(project, user)
         return {"email": user.email, "session_token": token, "expires_in_hours": SESSION_EXPIRY_HOURS}
+    finally:
+        session.close()
+
+
+def mfa_verify(preauth_token: str, otp: str) -> dict:
+    payload = _verify_preauth_token(preauth_token)
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, payload["project_id"])
+        user = _get_user_in_project(session, project, user_id=int(payload["sub"]))
+        if not user:
+            raise AuthSvcError("Invalid or expired code")
+        v = session.query(AuthVerification).filter_by(
+            user_id=user.id, purpose="mfa_login", consumed=False
+        ).order_by(AuthVerification.created_at.desc()).first()
+        if not v or v.expires_at < utcnow() or not secrets.compare_digest(v.otp_code, (otp or "").strip()):
+            raise AuthSvcError("Invalid or expired code")
+        v.consumed = True
+        session.commit()
+
+        token = _issue_session_token(project, user)
+        return {"email": user.email, "session_token": token, "expires_in_hours": SESSION_EXPIRY_HOURS}
+    finally:
+        session.close()
+
+
+def verify_email_otp(api_key: str, email: str, otp: str) -> dict:
+    email = (email or "").strip().lower()
+    session = get_session()
+    try:
+        project = _get_project_by_api_key(session, api_key)
+        user = _get_user_in_project(session, project, email=email)
+        if not user:
+            raise AuthSvcError("Invalid code")
+        v = session.query(AuthVerification).filter_by(
+            user_id=user.id, purpose="email_verify", consumed=False
+        ).order_by(AuthVerification.created_at.desc()).first()
+        if not v or v.expires_at < utcnow() or not secrets.compare_digest(v.otp_code, (otp or "").strip()):
+            raise AuthSvcError("Invalid or expired code")
+        v.consumed = True
+        user.email_verified = True
+        session.commit()
+        return {"email": user.email, "verified": True}
     finally:
         session.close()
 
@@ -642,33 +772,33 @@ def forgot_password(api_key: str, email: str, base_link_url: str | None = None) 
     session = get_session()
     try:
         project = _get_project_by_api_key(session, api_key)
-        user = session.query(AuthEndUser).filter_by(project_id=project.id, email=email).first()
+        user = _get_user_in_project(session, project, email=email)
         if not user:
             return {"email_sent": True}  # don't leak account existence
-        verification = _issue_verification(session, project, user, "password_reset")
-        _deliver_verification(session, project, user, verification, "password_reset", base_link_url)
+        verification, raw_token = _issue_verification(session, project, user, "password_reset")
+        _deliver_verification(session, project, user, raw_token, verification.otp_code,
+                               "password_reset", base_link_url)
         return {"email_sent": True}
     finally:
         session.close()
 
 
-def reset_password(api_key: str, email: str, otp_or_token: str, new_password: str) -> dict:
+def reset_password(api_key: str, email: str, otp: str, new_password: str) -> dict:
+    """The OTP path — pairs with api_key+email like the rest of the
+    API-key-scoped flows. For the emailed LINK, use reset_password_by_token
+    instead: the token alone is proof enough, no api_key needed."""
     email = (email or "").strip().lower()
     session = get_session()
     try:
         project = _get_project_by_api_key(session, api_key)
-        user = session.query(AuthEndUser).filter_by(project_id=project.id, email=email).first()
+        user = _get_user_in_project(session, project, email=email)
         if not user:
             raise AuthSvcError("Invalid or expired code")
 
         v = session.query(AuthVerification).filter_by(
             user_id=user.id, purpose="password_reset", consumed=False
         ).order_by(AuthVerification.created_at.desc()).first()
-        matches = v and v.expires_at >= utcnow() and (
-            secrets.compare_digest(v.token, otp_or_token) or
-            secrets.compare_digest(v.otp_code, otp_or_token)
-        )
-        if not matches:
+        if not v or v.expires_at < utcnow() or not secrets.compare_digest(v.otp_code, (otp or "").strip()):
             raise AuthSvcError("Invalid or expired code")
 
         validate_password_strength(new_password, project.password_min_length, email=email)
@@ -679,5 +809,103 @@ def reset_password(api_key: str, email: str, otp_or_token: str, new_password: st
         v.consumed = True
         session.commit()
         return {"email": user.email, "password_reset": True}
+    finally:
+        session.close()
+
+
+def reset_password_by_token(token: str, new_password: str) -> dict:
+    """Used by the emailed reset link's landing page. The token is a
+    single-use bearer capability scoped to exactly one user/purpose — no
+    API key travels in the email, so a leaked/forwarded link can reset
+    that one account's password and nothing else."""
+    session = get_session()
+    try:
+        v = _find_verification_by_token(session, token, "password_reset")
+        if not v or v.expires_at < utcnow():
+            raise AuthSvcError("Reset link is invalid, already used, or has expired")
+        user = session.query(AuthEndUser).filter_by(id=v.user_id).first()
+        project = session.query(AuthProject).filter_by(id=user.project_id).first()
+
+        validate_password_strength(new_password, project.password_min_length, email=user.email)
+        v.consumed = True
+        user.password_hash = hash_password(new_password)
+        user.failed_attempts = 0
+        user.lockout_count = 0
+        user.locked_until = None
+        session.commit()
+        return {"email": user.email, "password_reset": True}
+    finally:
+        session.close()
+
+
+# ---------------------------------------------------------------------------
+# Email change — requires an active session (proof the caller already
+# controls the account), verified at the NEW address before it takes
+# effect, so a stolen session token alone can't quietly redirect future
+# password-reset emails to an attacker's inbox without the account owner
+# ever seeing a confirmation land in their existing mailbox... actually
+# the confirmation goes to the NEW address by design (that's what's being
+# proven); see request_email_change for the session-token requirement
+# that gates who can even start this.
+# ---------------------------------------------------------------------------
+
+def request_email_change(session_token: str, new_email: str, base_link_url: str | None = None) -> dict:
+    new_email = (new_email or "").strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", new_email):
+        raise AuthSvcError("Invalid email address")
+
+    payload = verify_session_token(session_token)
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, payload["project_id"])
+        user = _get_user_in_project(session, project, user_id=int(payload["sub"]))
+        if not user:
+            raise AuthSvcError("Session no longer valid")
+
+        clash = session.query(AuthEndUser).filter_by(project_id=project.id, email=new_email).first()
+        if clash:
+            raise AuthSvcError("That email is already in use")
+
+        verification, raw_token = _issue_verification(session, project, user, "email_change", new_email=new_email)
+        _deliver_verification(session, project, user, raw_token, verification.otp_code,
+                               "email_change", base_link_url, to_email=new_email)
+        return {"email_sent": True, "new_email": new_email}
+    finally:
+        session.close()
+
+
+def confirm_email_change_token(token: str) -> dict:
+    session = get_session()
+    try:
+        v = _find_verification_by_token(session, token, "email_change")
+        if not v or v.expires_at < utcnow() or not v.new_email:
+            raise AuthSvcError("Confirmation link is invalid, already used, or has expired")
+        user = session.query(AuthEndUser).filter_by(id=v.user_id).first()
+        v.consumed = True
+        user.email = v.new_email
+        session.commit()
+        return {"email": user.email, "email_changed": True}
+    finally:
+        session.close()
+
+
+def confirm_email_change_otp(session_token: str, otp: str) -> dict:
+    payload = verify_session_token(session_token)
+    session = get_session()
+    try:
+        project = _get_project_by_project_id(session, payload["project_id"])
+        user = _get_user_in_project(session, project, user_id=int(payload["sub"]))
+        if not user:
+            raise AuthSvcError("Session no longer valid")
+        v = session.query(AuthVerification).filter_by(
+            user_id=user.id, purpose="email_change", consumed=False
+        ).order_by(AuthVerification.created_at.desc()).first()
+        if not v or v.expires_at < utcnow() or not v.new_email or \
+                not secrets.compare_digest(v.otp_code, (otp or "").strip()):
+            raise AuthSvcError("Invalid or expired code")
+        v.consumed = True
+        user.email = v.new_email
+        session.commit()
+        return {"email": user.email, "email_changed": True}
     finally:
         session.close()

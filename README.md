@@ -8,7 +8,7 @@ Cyan Server is a cross-platform server-builder and management platform. It is **
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](requirements.txt)
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#-platform-support)
-[![Version](https://img.shields.io/badge/version-0.10.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
+[![Version](https://img.shields.io/badge/version-0.11.0-orange.svg)](https://github.com/nadeemmhdm/cyan-server/releases)
 
 Open source, Apache 2.0 licensed. Every feature below has been tested live against a real running agent — no mocked data, no placeholder buttons. See [What's verified](#-whats-verified) for exactly what's been proven and what still needs real-world testing.
 
@@ -89,10 +89,13 @@ Dashboard: `http://localhost:7331` (or `http://<device-ip>:7331` from anywhere o
 
 ### Auth Service — email+password auth as a feature
 - Add real user authentication to your own app or site: create a **project**, get a **project ID + API key**, point your signup/login forms at it
-- Email verification via both a link and a 6-digit OTP; password reset the same way
+- Email verification via both a link and a 6-digit OTP; password reset the same way — every link token is **single-use, stored only as a hash**, and (for reset/email-change) carries no API key, so a leaked link can only act on that one account
+- Optional **email-OTP multi-factor authentication** per project, and a session-gated **email change** flow confirmed at the new address before it takes effect
+- Default success/failure landing pages for emailed links out of the box — no separate frontend required to handle a click
 - SMTP is collected only when you configure this feature, and is **verified with a real login attempt** before being saved — nothing sends until that check passes
 - Real password policy (length, character classes, common-password denylist), real bcrypt hashing, and a **database-backed progressive lockout** (each repeat lockout doubles the cooldown) — not just an in-memory rate limit that resets on restart
-- Editable per-project email templates
+- **Row-level isolation between projects**, enforced at the application layer through one centralized, always-scoped lookup — a project's API key or session token can never resolve another project's rows
+- Editable per-project email templates (verify, reset, email-change, MFA code)
 - `cyan auth project-create`, `cyan auth smtp`, `cyan auth policy`, `cyan auth template-edit` — see [docs/COMMANDS.md](docs/COMMANDS.md#auth-service)
 
 ### Web hosting

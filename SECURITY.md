@@ -22,11 +22,11 @@ disclosure timeline.
 
 | Version | Supported |
 |---|---|
-| 0.10.x  | ✅ |
-| 0.6.x – 0.9.x | ✅ (upgrade recommended — `cyan update`) |
+| 0.11.x  | ✅ |
+| 0.6.x – 0.10.x | ✅ (upgrade recommended — `cyan update`) |
 | < 0.6   | ❌ (upgrade — `cyan update`) |
 
-## Current security posture (v0.10.0)
+## Current security posture (v0.11.0)
 
 - Passwords: bcrypt-hashed, never stored or logged in plaintext.
 - **Auth Service** (project-scoped end-user authentication): passwords
@@ -40,6 +40,25 @@ disclosure timeline.
   separate from the admin dashboard's, so one can never be replayed as
   the other; login responses are shaped to avoid confirming whether an
   email is registered.
+  - Verification/reset/email-change **link tokens are single-use and
+    stored only as a SHA-256 hash** — a database leak alone can't yield
+    a working link. The password-reset and email-change links carry
+    only the token, no API key, so a leaked link can act on exactly
+    one account.
+  - Optional **email-OTP multi-factor authentication** per project — a
+    successful password check returns a short-lived pre-auth token
+    (5 min) instead of a session; the real session is only issued after
+    the emailed code is also verified. Requires SMTP to already be
+    configured.
+  - Email changes require an active session and are confirmed at the
+    **new** address (link or OTP) before taking effect; a taken email
+    can't be reused across accounts in the same project.
+  - Row-level isolation between projects is enforced at the application
+    layer (SQLite has no native RLS): every end-user lookup goes
+    through one centralized, always project-scoped helper, so a valid
+    API key or session token for project A can never resolve or act on
+    project B's rows, even with a matching email address — covered by
+    an explicit cross-project test.
 - Optional TOTP two-factor authentication per user, on top of the
   password/JWT flow below.
 - Sessions: JWT, 12-hour expiry, signed with a per-install secret generated
